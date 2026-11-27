@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { APP_ENABLED } from '../lib/flags.js';
+import { homeFor, useSession } from '../lib/session.jsx';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -13,28 +16,42 @@ function Eye({ off }) {
 }
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { user, signIn } = useSession();
   const [errors, setErrors] = useState({});
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [formError, setFormError] = useState('');
 
-  function onSubmit(e) {
+  // Already signed in: go straight to where this person belongs.
+  if (user) return <Navigate to={homeFor(user)} replace />;
+
+  async function onSubmit(e) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
     const next = {};
     if (!emailRe.test(email)) next.email = 'Enter a valid email address.';
-    if (password.length < 8) next.password = 'Password must be at least 8 characters.';
+    if (!password) next.password = 'Enter your password.';
     setErrors(next);
     setNotice('');
+    setFormError('');
     if (Object.keys(next).length) return;
-    // Backend is not connected yet: the real /auth/login call goes here.
+
+    if (!APP_ENABLED) {
+      setNotice('Sign-in is not available yet.');
+      return;
+    }
     setBusy(true);
-    setTimeout(() => {
+    try {
+      const signedIn = await signIn(email, password);
+      navigate(homeFor(signedIn), { replace: true });
+    } catch (err) {
+      setFormError(err.message);
       setBusy(false);
-      setNotice('Design preview only. The sign-in API is not connected yet.');
-    }, 900);
+    }
   }
 
   return (
@@ -104,6 +121,7 @@ export default function Login() {
                 Keep me signed in on this device
               </label>
 
+              {formError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{formError}</p>}
               {notice && <p role="status" className="rounded-xl border border-accent/30 bg-tint px-4 py-3 text-[13px] text-ink">{notice}</p>}
 
               <button type="submit" disabled={busy} className="btn-solid w-full !py-3.5 text-[15px]">
