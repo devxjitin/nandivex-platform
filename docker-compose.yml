@@ -11,7 +11,8 @@
 # Database                   localhost:5441  (user nandivex, password nandivex, database nandivex)
 #
 # Secrets and the first admin login come from .env (copy .env.example). Emails are really sent over
-# SMTP, to Mailpit here, so nothing leaves your machine.
+# SMTP. By default that is Mailpit, so nothing leaves your machine; set the SMTP_* values in .env to
+# send through Resend instead.
 services:
   web:
     build: .
@@ -60,9 +61,13 @@ services:
       PORT: "4000"
       DATABASE_URL: postgresql://nandivex:nandivex@db:5432/nandivex
       WEB_URL: http://localhost:5180
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
-      MAIL_FROM: NandiVex <support@nandivex.com>
+      # Mail goes to Mailpit unless .env sets these (see the Resend block in .env.example).
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-NandiVex <noreply@nandivex.in>}
     ports:
       - "4010:4000"
     volumes:
