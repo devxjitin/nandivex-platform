@@ -9,7 +9,7 @@ datasource db {
 
 enum UserStatus {
   INVITED // account created, login emailed, has not signed in yet
-  ACTIVE  // has signed in at least once
+  ACTIVE // has signed in at least once
 }
 
 // Roles are not fixed. An admin picks an existing one or types a new name when adding someone,
@@ -23,18 +23,57 @@ model Role {
 }
 
 model User {
-  id                 String     @id @default(uuid())
+  id                 String               @id @default(uuid())
   name               String
   // Stored lower-case. Everyone has their own address.
-  email              String     @unique
+  email              String               @unique
   role               String
   passwordHash       String
-  mustChangePassword Boolean    @default(true)
-  status             UserStatus @default(INVITED)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  mustChangePassword Boolean              @default(true)
+  status             UserStatus           @default(INVITED)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   lastLoginAt        DateTime?
+  // Set when a profile photo is uploaded, cleared when it is removed. The web app uses it to refresh the picture.
+  photoUpdatedAt     DateTime?
   resetTokens        PasswordResetToken[]
+  profile            Profile?
+  photo              ProfilePhoto?
+  notifications      Notification[]
+}
+
+// Personal and payroll details each person keeps about themselves. PAN and the bank account number are
+// stored encrypted (AES-256-GCM); only the last four characters are kept readable, for display.
+model Profile {
+  userId            String    @id
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth       DateTime? @db.Date
+  gender            String?
+  bloodGroup        String?
+  phone             String?
+  emergencyName     String?
+  emergencyRelation String?
+  emergencyPhone    String?
+  currentAddress    Json?
+  permanentAddress  Json?
+  panEnc            String?
+  panLast4          String?
+  bankHolder        String?
+  bankName          String?
+  bankIfsc          String?
+  bankBranch        String?
+  bankAccountEnc    String?
+  bankAccountLast4  String?
+  updatedAt         DateTime  @updatedAt
+}
+
+// The profile picture, resized in the browser before upload, so it stays small.
+model ProfilePhoto {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType String
+  data        Bytes
+  updatedAt   DateTime @updatedAt
 }
 
 // One-time links for "Forgot password". Only a hash of the token is stored, so a copy of the
@@ -49,4 +88,31 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+// Who looked at someone else's sensitive details (full PAN or bank account number), and when.
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  targetId  String
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([targetId, createdAt])
+}
+
+// Things worth telling someone about: shown under the bell in the top bar.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  // A page in the web app to open when the notification is clicked.
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

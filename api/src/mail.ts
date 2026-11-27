@@ -31,14 +31,20 @@ interface Shell {
 
 /** The one company layout every email uses. */
 function renderShell(s: Shell): string {
-  const logoUrl = `${webBase()}/brand/logo-horizontal.png`;
+  // A small square icon plus the name as real text: it still reads when a mail app blocks images.
+  const iconUrl = `${webBase()}/brand/email-icon.png`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(s.subject)}</title></head>
 <body style="margin:0;padding:0;background:#f4f1f9;font-family:Inter,'Segoe UI',Arial,Helvetica,sans-serif;color:#1b1426">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f4f1f9">${esc(s.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1f9"><tr><td align="center" style="padding:32px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
-<tr><td style="padding:0 4px 20px"><img src="${esc(logoUrl)}" width="150" alt="${COMPANY}" style="display:block;border:0;height:auto;font-size:15px;font-weight:700;color:#1b1426"></td></tr>
+<tr><td style="padding:0 4px 20px">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="vertical-align:middle"><img src="${esc(iconUrl)}" width="40" height="40" alt="" style="display:block;border:0;border-radius:10px"></td>
+    <td style="vertical-align:middle;padding-left:12px;font-size:18px;font-weight:700;letter-spacing:-.01em;color:#1b1426">NandiVex <span style="color:#7a3ce0">Technologies</span></td>
+  </tr></table>
+</td></tr>
 <tr><td style="background:#ffffff;border:1px solid #e6def2;border-radius:16px;overflow:hidden">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
   <tr><td style="height:4px;background:#7a3ce0;font-size:0;line-height:0">&nbsp;</td></tr>

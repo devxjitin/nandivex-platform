@@ -37,6 +37,8 @@ export const toDto = (u: User) => ({
   mustChangePassword: u.mustChangePassword,
   createdAt: u.createdAt.toISOString(),
   lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+  // Changes whenever the picture does; null when there is none.
+  photoVersion: u.photoUpdatedAt ? u.photoUpdatedAt.getTime() : null,
 });
 
 /** Loads the signed-in user from the cookie. The user is read from the database on every request,

@@ -30,3 +30,21 @@
 @keyframes float { 0%, 100% { transform: translateY(0) rotate(12deg); } 50% { transform: translateY(-10px) rotate(12deg); } }
 .float-slow { animation: float 7s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .page-in, .float-slow { animation: none; } }
+
+/* Dropdown list (Select component) opens with a short fade and lift. */
+.select-pop { animation: selectpop .14s ease both; }
+@keyframes selectpop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .select-pop { animation: none; } }
+
+/* Toasts: slide up with a soft overshoot, a check mark that draws itself, and a timer bar that runs down. */
+.toast-in { animation: toastin .42s cubic-bezier(.22, 1.2, .36, 1) both; }
+.toast-out { animation: toastout .22s ease-in both; }
+@keyframes toastin { from { opacity: 0; transform: translateY(24px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes toastout { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(12px) scale(.96); } }
+.toast-bar { width: 100%; transform-origin: left; animation: toastbar linear forwards; }
+@keyframes toastbar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.toast-pop { animation: toastpop .5s cubic-bezier(.22, 1.4, .36, 1) .12s both; }
+@keyframes toastpop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast-check { stroke-dasharray: 24; stroke-dashoffset: 24; animation: toastcheck .4s ease-out .3s forwards; }
+@keyframes toastcheck { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .toast-in, .toast-out, .toast-pop, .toast-check { animation: none; stroke-dashoffset: 0; } }

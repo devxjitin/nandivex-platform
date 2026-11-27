@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireManager, toDto } from '../auth';
+import { decryptField } from '../crypto';
 import { prisma } from '../db';
 import { sendLoginEmail } from '../mail';
+import { notify, notifyManagers } from '../notify';
 import { generatePassword, hashPassword, passwordSchema } from '../password';
+import { profileDto } from './profile';
 import { MANAGER_ROLE_NAMES, canonicalRole, isManagerRole, roleKey, roleNameSchema } from '../roles';
 
 export const employeesRouter = Router();
@@ -47,6 +50,7 @@ employeesRouter.post('/', async (req, res) => {
     emailSent = false;
     console.error('Login email failed', err);
   }
+  await notifyManagers({ type: 'employee_added', title: `${created.name} was added`, body: `Role: ${created.role}`, link: `/admin/employees/${created.id}` }, req.user!.id, created.id);
   return res.status(201).json({ employee: toDto(created), emailSent });
 });
 
@@ -70,6 +74,7 @@ employeesRouter.post('/:id/reset-password', async (req, res) => {
     emailSent = false;
     console.error('Reset email failed', err);
   }
+  await notify([user.id], { type: 'password_reset', title: 'Your password was reset', body: 'An admin set a new password for you. It was sent to your email.' });
   return res.json({ emailSent });
 });
 
@@ -85,5 +90,44 @@ employeesRouter.delete('/:id', async (req, res) => {
     if (managers <= 1) return res.status(400).json({ error: 'At least one admin must remain.' });
   }
   await prisma.user.delete({ where: { id: user.id } });
+  await notifyManagers({ type: 'employee_removed', title: `${user.name} was removed`, body: `Removed by ${req.user!.name}` }, req.user!.id);
   return res.status(204).end();
+});
+
+// --- Everyone's details, for managers -------------------------------------------------------
+
+employeesRouter.get('/:id/profile', async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) return res.status(404).json({ error: 'Employee not found.' });
+  const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
+  return res.json({ profile: profileDto(user, profile) });
+});
+
+employeesRouter.get('/:id/photo', async (req, res) => {
+  const photo = await prisma.profilePhoto.findUnique({ where: { userId: req.params.id } });
+  if (!photo) return res.status(404).json({ error: 'No picture yet.' });
+  res.setHeader('Content-Type', photo.contentType);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  return res.send(Buffer.from(photo.data));
+});
+
+const revealBody = z.object({ field: z.enum(['pan', 'bankAccount']) });
+
+// The full PAN and account number are only sent when a manager asks for them, and each request is recorded.
+employeesRouter.post('/:id/profile/reveal', async (req, res) => {
+  const parsed = revealBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Choose pan or bankAccount.' });
+  const profile = await prisma.profile.findUnique({ where: { userId: req.params.id } });
+  const stored = parsed.data.field === 'pan' ? profile?.panEnc : profile?.bankAccountEnc;
+  if (!stored) return res.status(404).json({ error: 'Nothing saved yet.' });
+  let value: string;
+  try {
+    value = decryptField(stored);
+  } catch {
+    return res.status(500).json({ error: 'Could not read this value.' });
+  }
+  await prisma.auditLog.create({
+    data: { actorId: req.user!.id, targetId: req.params.id, action: `reveal_${parsed.data.field}` },
+  });
+  return res.json({ value });
 });

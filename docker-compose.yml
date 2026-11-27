@@ -61,6 +61,8 @@ services:
       PORT: "4000"
       DATABASE_URL: postgresql://nandivex:nandivex@db:5432/nandivex
       WEB_URL: http://localhost:5180
+      # Local-only key for encrypting PAN and bank numbers. Real environments set their own in .env.
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
       # Mail goes to Mailpit unless .env sets these (see the Resend block in .env.example).
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
