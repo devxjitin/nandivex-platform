@@ -179,7 +179,7 @@ export default function AddEmployee() {
           </div>
         </form>
 
-        <aside className="rounded-2xl border border-line bg-surface p-6 shadow-card xl:sticky xl:top-10">
+        <aside className="rounded-2xl border border-line bg-surface p-6 shadow-card xl:sticky xl:top-24">
           <h2 className="text-lg">What happens next</h2>
           <ol className="mt-5 space-y-5">
             {steps.map(([title, text], i) => (
