@@ -46,6 +46,10 @@
 .shell-crumbs { display: flex; align-items: center; gap: 6px; font-size: .86rem; font-weight: 500; color: rgb(var(--c-muted)); min-width: 0; white-space: nowrap; }
 .shell-crumbs span { display: inline-flex; align-items: center; gap: 6px; }
 .shell-crumbs .current { font-weight: 600; color: rgb(var(--c-ink)); }
+.shell-crumb-link { border-radius: 6px; transition: color .15s ease; }
+.shell-crumb-link:hover { color: rgb(var(--c-accent)); }
+.shell-crumb-link:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
+.shell-role { margin-left: auto; max-width: 180px; padding: 5px 14px; border-radius: 999px; background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-size: .8rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shell-main { min-width: 0; padding-top: var(--bar); }
 .shell-scrim { position: fixed; inset: 0; z-index: 35; background: rgba(27, 20, 38, .4); backdrop-filter: blur(2px); }
 

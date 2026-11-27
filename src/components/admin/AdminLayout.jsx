@@ -144,10 +144,11 @@ export default function AdminLayout({ children }) {
             {trail.map((c, i) => (
               <span key={c} className={i === trail.length - 1 ? 'current' : undefined}>
                 <ChevronIcon />
-                {c}
+                {i === trail.length - 1 ? c : <Link to="/admin" className="shell-crumb-link">{c}</Link>}
               </span>
             ))}
           </nav>
+          {user?.role && <span className="shell-role" title="Your role">{user.role}</span>}
         </header>
         <main className="min-w-0 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">{children}</main>
       </div>
