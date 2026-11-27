@@ -105,7 +105,7 @@ export default function Select({
         aria-activedescendant={open ? `${baseId}-opt-${active}` : undefined} aria-invalid={invalid || undefined}
         aria-label={ariaLabel} aria-describedby={describedBy} disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown}
-        className={`field flex items-center justify-between gap-3 text-left ${compact ? '!px-3 !py-2 !text-[14px]' : ''} ${invalid ? 'field-error' : ''} ${open ? '!border-accent !ring-4 !ring-accent/15' : ''} disabled:cursor-not-allowed disabled:opacity-60`}
+        className={`field flex items-center justify-between gap-3 text-left ${compact ? '!gap-1.5 !px-2.5 !py-2 !text-[14px]' : ''} ${invalid ? 'field-error' : ''} ${open ? '!border-accent !ring-4 !ring-accent/15' : ''} disabled:cursor-not-allowed disabled:opacity-60`}
       >
         <span className={`truncate ${selected && selected.value !== '' ? '' : 'text-muted/70'}`}>{selected && selected.value !== '' ? selected.label : (selected?.label || placeholder)}</span>
         <Chevron open={open} />
@@ -114,7 +114,7 @@ export default function Select({
       {open && (
         <ul
           ref={listRef} id={listId} role="listbox" aria-labelledby={baseId} tabIndex={-1}
-          className={`absolute left-0 right-0 z-40 max-h-64 overflow-auto rounded-xl border border-line bg-surface p-1.5 shadow-lift ${up ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'} select-pop`}
+          className={`absolute left-0 ${compact ? 'min-w-full w-max' : 'right-0'} z-40 max-h-64 overflow-auto rounded-xl border border-line bg-surface p-1.5 shadow-lift ${up ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'} select-pop`}
         >
           {items.map((o, i) => {
             const isSel = o.value === value;
@@ -124,7 +124,7 @@ export default function Select({
                 onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(i)}
                 className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-[14px] ${i === active ? 'bg-tint text-accent-dark' : 'text-ink'} ${isSel ? 'font-semibold' : 'font-medium'}`}
               >
-                <span className="truncate">{o.label}</span>
+                <span className={compact ? 'whitespace-nowrap' : 'truncate'}>{o.label}</span>
                 {isSel && <Check />}
               </li>
             );

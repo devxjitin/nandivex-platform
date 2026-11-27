@@ -105,11 +105,11 @@ export default function DatePicker({ id, value, onChange, max, min = '1940-01-01
 
       {open && (
         <div role="dialog" aria-label="Choose a date" className={`select-pop absolute left-0 z-40 w-[324px] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-line bg-surface p-4 shadow-lift ${up ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
-          <div className="mb-3 flex items-center gap-2">
-            <button type="button" onClick={() => step(-1)} disabled={prevDisabled} aria-label="Previous month" className="grid h-9 w-9 flex-none place-items-center rounded-full border border-line text-muted transition enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"><Arrow dir="left" /></button>
+          <div className="mb-3 flex items-center gap-1.5">
+            <button type="button" onClick={() => step(-1)} disabled={prevDisabled} aria-label="Previous month" className="grid h-8 w-8 flex-none place-items-center rounded-full border border-line text-muted transition enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"><Arrow dir="left" /></button>
             <Select aria-label="Month" compact value={String(view.m)} onChange={(v) => setView((x) => ({ ...x, m: +v }))} options={MONTHS.map((m, i) => ({ value: String(i), label: m }))} className="min-w-0 flex-1" />
-            <Select aria-label="Year" compact value={String(view.y)} onChange={(v) => setView((x) => ({ ...x, y: +v }))} options={years} className="w-[88px] flex-none" />
-            <button type="button" onClick={() => step(1)} disabled={nextDisabled} aria-label="Next month" className="grid h-9 w-9 flex-none place-items-center rounded-full border border-line text-muted transition enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"><Arrow dir="right" /></button>
+            <Select aria-label="Year" compact value={String(view.y)} onChange={(v) => setView((x) => ({ ...x, y: +v }))} options={years} className="w-[78px] flex-none" />
+            <button type="button" onClick={() => step(1)} disabled={nextDisabled} aria-label="Next month" className="grid h-8 w-8 flex-none place-items-center rounded-full border border-line text-muted transition enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"><Arrow dir="right" /></button>
           </div>
 
           <div className="grid grid-cols-7 gap-y-1 text-center">
