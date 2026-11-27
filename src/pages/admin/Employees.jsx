@@ -96,8 +96,7 @@ export default function Employees() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label">Admin</p>
-          <h1 className="mt-2 text-3xl sm:text-4xl">Employees</h1>
+          <h1 className="text-3xl sm:text-4xl">Employees</h1>
           <p className="mt-2 max-w-xl text-[15px] text-muted">Add people, give each one a role and set their password. Their login details are emailed when the account is created.</p>
         </div>
         <Link to="/admin/employees/new" className="btn-solid">

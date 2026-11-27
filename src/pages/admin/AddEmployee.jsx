@@ -21,6 +21,7 @@ function generatePassword() {
 
 const OTHER = '__other__';
 const roleNameOk = (s) => /^[\p{L}\p{N} &/.+()-]{2,40}$/u.test(s.trim().replace(/\s+/g, ' '));
+const passwordOk = (p) => p.length >= 10 && /[A-Za-z]/.test(p) && /\d/.test(p);
 
 function validate({ name, email, role, password }) {
   const errors = {};
@@ -28,21 +29,30 @@ function validate({ name, email, role, password }) {
   if (!emailRe.test(email.trim())) errors.email = 'Enter a valid email address.';
   if (!role) errors.role = 'Choose a role.';
   else if (!roleNameOk(role)) errors.role = 'Role name: 2 to 40 characters, letters and numbers only.';
-  if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-    errors.password = 'At least 10 characters, with a letter and a number.';
-  }
+  if (!passwordOk(password)) errors.password = 'At least 10 characters, with a letter and a number.';
   return errors;
+}
+
+/** Live strength of the password being typed. Below the minimum rule it is always Weak. */
+function strengthOf(password) {
+  if (!password) return null;
+  if (!passwordOk(password)) return { level: 1, label: 'Weak', hint: 'Use 10+ characters with a letter and a number.', bar: 'bg-red-500', text: 'text-red-600' };
+  const extras =
+    (/[a-z]/.test(password) && /[A-Z]/.test(password) ? 1 : 0) +
+    (/[^A-Za-z0-9]/.test(password) ? 1 : 0) +
+    (password.length >= 14 ? 1 : 0);
+  if (extras === 0) return { level: 2, label: 'Fair', hint: 'Add capitals, a symbol or more length.', bar: 'bg-amber-500', text: 'text-amber-600' };
+  if (extras === 1) return { level: 3, label: 'Good', hint: '', bar: 'bg-lime-500', text: 'text-lime-700' };
+  return { level: 4, label: 'Strong', hint: '', bar: 'bg-emerald-600', text: 'text-emerald-700' };
 }
 
 function FieldError({ id, children }) {
   return children ? <p id={id} className="mt-1.5 text-[13px] text-red-500">{children}</p> : null;
 }
 
-const steps = [
-  ['Account is created', 'With the role and password you set here.'],
-  ['Login details are emailed', 'The email goes to the address you enter, right away.'],
-  ['They sign in', 'And change the password if you asked them to.'],
-];
+function Req() {
+  return <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>;
+}
 
 export default function AddEmployee() {
   const navigate = useNavigate();
@@ -99,101 +109,91 @@ export default function AddEmployee() {
     }
   }
 
+  const strength = strengthOf(values.password);
+
   return (
     <AdminLayout>
-      <Link to="/admin" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition hover:text-accent">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-        Employees
-      </Link>
+      <h1 className="text-3xl sm:text-4xl">Add employee</h1>
 
-      <div className="mt-6">
-        <p className="label">Admin</p>
-        <h1 className="mt-2 text-3xl sm:text-4xl">Add employee</h1>
-        <p className="mt-2 max-w-xl text-[15px] text-muted">Create the account and set the role and password. The login details are emailed as soon as it is created.</p>
-      </div>
-
-      <div className="mt-8 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <form onSubmit={submit} noValidate className="space-y-8 rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
-          <section>
-            <h2 className="text-lg">Person</h2>
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <div>
-                <label htmlFor="emp-name" className="mb-1.5 block text-sm font-semibold">Full name</label>
-                <input id="emp-name" value={values.name} onChange={set('name')} autoComplete="off" placeholder="Full name" aria-invalid={!!errors.name} aria-describedby={errors.name ? 'emp-name-err' : undefined} className={cls('name')} />
-                <FieldError id="emp-name-err">{errors.name}</FieldError>
-              </div>
-              <div>
-                <label htmlFor="emp-email" className="mb-1.5 block text-sm font-semibold">Email</label>
-                <input id="emp-email" type="email" value={values.email} onChange={set('email')} autoComplete="off" placeholder="name@example.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'emp-email-err' : undefined} className={cls('email')} />
-                <FieldError id="emp-email-err">{errors.email}</FieldError>
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-lg">Access</h2>
-            <div className="mt-5 space-y-5">
-              <div className="grid gap-5 sm:max-w-xl sm:grid-cols-2">
-                <div>
-                  <label htmlFor="emp-role" className="mb-1.5 block text-sm font-semibold">Role</label>
-                  <select id="emp-role" value={roleChoice} onChange={onRoleChange} aria-invalid={!!errors.role && roleChoice !== OTHER} aria-describedby={errors.role && roleChoice !== OTHER ? 'emp-role-err' : undefined} className={cls('role')}>
-                    <option value="" disabled>Select a role</option>
-                    {savedRoles.map((r) => <option key={r} value={r}>{r}</option>)}
-                    <option value={OTHER}>Other…</option>
-                  </select>
-                  {roleChoice !== OTHER && <FieldError id="emp-role-err">{errors.role}</FieldError>}
-                </div>
-                {roleChoice === OTHER && (
-                  <div>
-                    <label htmlFor="emp-role-name" className="mb-1.5 block text-sm font-semibold">Role name</label>
-                    <input id="emp-role-name" value={customRole} onChange={onCustomRoleChange} autoFocus autoComplete="off" placeholder="e.g. Marketing Lead" aria-invalid={!!errors.role} aria-describedby={errors.role ? 'emp-role-err' : undefined} className={cls('role')} />
-                    <FieldError id="emp-role-err">{errors.role}</FieldError>
-                  </div>
-                )}
-              </div>
-
-              <div className="sm:max-w-md">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label htmlFor="emp-password" className="text-sm font-semibold">Password</label>
-                  <button type="button" onClick={() => { setValues((v) => ({ ...v, password: generatePassword() })); setShowPw(true); clearError('password'); }} className="text-[13px] font-semibold text-accent hover:text-accent-dark">Generate strong password</button>
-                </div>
-                <div className="relative">
-                  <input id="emp-password" type={showPw ? 'text' : 'password'} value={values.password} onChange={set('password')} autoComplete="new-password" placeholder="Set a password" aria-invalid={!!errors.password} aria-describedby={errors.password ? 'emp-pw-err' : undefined} className={`${cls('password')} pr-16 font-mono`} />
-                  <button type="button" onClick={() => setShowPw((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-muted transition hover:text-accent">{showPw ? 'Hide' : 'Show'}</button>
-                </div>
-                <FieldError id="emp-pw-err">{errors.password}</FieldError>
-              </div>
-
-              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-muted">
-                <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-line accent-[rgb(var(--c-accent))]" />
-                <span>Ask them to change this password the first time they sign in <span className="text-ink/70">(recommended, since it travels by email)</span></span>
-              </label>
-            </div>
-          </section>
-
-          {formError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{formError}</p>}
-
-          <div className="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:justify-end">
-            <Link to="/admin" className="btn-line">Cancel</Link>
-            <button type="submit" disabled={busy} className="btn-solid">{busy ? 'Creating…' : 'Create account and send email'}</button>
+      <form onSubmit={submit} noValidate className="mt-8 rounded-2xl border border-line bg-surface shadow-card">
+        <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
+          <div>
+            <label htmlFor="emp-name" className="mb-1.5 block text-sm font-semibold">Full name<Req /></label>
+            <input id="emp-name" value={values.name} onChange={set('name')} autoComplete="off" placeholder="Full name" aria-invalid={!!errors.name} aria-describedby={errors.name ? 'emp-name-err' : undefined} className={cls('name')} />
+            <FieldError id="emp-name-err">{errors.name}</FieldError>
           </div>
-        </form>
 
-        <aside className="rounded-2xl border border-line bg-surface p-6 shadow-card xl:sticky xl:top-24">
-          <h2 className="text-lg">What happens next</h2>
-          <ol className="mt-5 space-y-5">
-            {steps.map(([title, text], i) => (
-              <li key={title} className="flex gap-3.5">
-                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-tint font-display text-sm font-bold text-accent-dark">{i + 1}</span>
-                <span>
-                  <span className="block text-sm font-semibold">{title}</span>
-                  <span className="block text-[13px] text-muted">{text}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </aside>
-      </div>
+          <div>
+            <label htmlFor="emp-email" className="mb-1.5 block text-sm font-semibold">Email address<Req /></label>
+            <input id="emp-email" type="email" value={values.email} onChange={set('email')} autoComplete="off" placeholder="name@example.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'emp-email-err' : undefined} className={cls('email')} />
+            <FieldError id="emp-email-err">{errors.email}</FieldError>
+          </div>
+
+          <div>
+            <label htmlFor="emp-role" className="mb-1.5 block text-sm font-semibold">Role<Req /></label>
+            <select id="emp-role" value={roleChoice} onChange={onRoleChange} aria-invalid={!!errors.role && roleChoice !== OTHER} aria-describedby={errors.role && roleChoice !== OTHER ? 'emp-role-err' : undefined} className={cls('role')}>
+              <option value="" disabled>Select a role</option>
+              {savedRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+              <option value={OTHER}>Other…</option>
+            </select>
+            {roleChoice !== OTHER && <FieldError id="emp-role-err">{errors.role}</FieldError>}
+          </div>
+
+          {roleChoice === OTHER && (
+            <div>
+              <label htmlFor="emp-role-name" className="mb-1.5 block text-sm font-semibold">New role name<Req /></label>
+              <input id="emp-role-name" value={customRole} onChange={onCustomRoleChange} autoFocus autoComplete="off" placeholder="e.g. Marketing Lead" aria-invalid={!!errors.role} aria-describedby={errors.role ? 'emp-role-err' : undefined} className={cls('role')} />
+              <FieldError id="emp-role-err">{errors.role}</FieldError>
+            </div>
+          )}
+
+          <div className="sm:col-start-1">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <label htmlFor="emp-password" className="text-sm font-semibold">Password<Req /></label>
+              <button type="button" onClick={() => { setValues((v) => ({ ...v, password: generatePassword() })); setShowPw(true); clearError('password'); }} className="text-[13px] font-semibold text-accent hover:text-accent-dark">Generate strong password</button>
+            </div>
+            <div className="relative">
+              <input id="emp-password" type={showPw ? 'text' : 'password'} value={values.password} onChange={set('password')} autoComplete="new-password" placeholder="Set a password" aria-invalid={!!errors.password} aria-describedby="emp-pw-strength" className={`${cls('password')} pr-16 font-mono`} />
+              <button type="button" onClick={() => setShowPw((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-muted transition hover:text-accent">{showPw ? 'Hide' : 'Show'}</button>
+            </div>
+            <div id="emp-pw-strength" aria-live="polite" className="mt-2.5 min-h-[34px]">
+              {strength && (
+                <>
+                  <div className="flex gap-1.5" aria-hidden="true">
+                    {[1, 2, 3, 4].map((n) => (
+                      <span key={n} className={`h-1.5 flex-1 rounded-full transition-colors duration-200 ${n <= strength.level ? strength.bar : 'bg-line'}`} />
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[13px]">
+                    <span className={`font-semibold ${strength.text}`}>{strength.label}</span>
+                    {strength.hint && <span className="text-muted"> · {strength.hint}</span>}
+                  </p>
+                </>
+              )}
+            </div>
+            {!strength && <FieldError id="emp-pw-err">{errors.password}</FieldError>}
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
+            <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="h-4 w-4 flex-none rounded border-line accent-[rgb(var(--c-accent))]" />
+            <span>Ask them to choose a new password at first sign-in</span>
+          </label>
+        </div>
+
+        {formError && (
+          <div className="border-t border-line px-6 py-4 sm:px-8">
+            <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{formError}</p>
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse gap-3 border-t border-line px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <p className="text-[13px] text-muted"><Req /> Required</p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            <Link to="/admin" className="btn-line">Cancel</Link>
+            <button type="submit" disabled={busy} className="btn-solid">{busy ? 'Creating…' : 'Create account'}</button>
+          </div>
+        </div>
+      </form>
     </AdminLayout>
   );
 }
