@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar.jsx';
 import Checkbox from '../components/Checkbox.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 import Select from '../components/Select.jsx';
+import { COUNTRIES, INDIAN_STATES, lookupPincode } from '../lib/places.js';
 import { getProfile, removePhoto, resizeImage, saveProfile, uploadPhoto } from '../lib/profileApi.js';
 import { useToast } from '../components/Toast.jsx';
 import { useSession } from '../lib/session.jsx';
@@ -16,9 +17,9 @@ const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const ADDRESS_FIELDS = [
   ['line1', 'Address line 1', 'sm:col-span-2'],
   ['line2', 'Address line 2', 'sm:col-span-2'],
+  ['pincode', 'Pincode', ''],
   ['city', 'City', ''],
   ['state', 'State', ''],
-  ['pincode', 'Pincode', ''],
   ['country', 'Country', ''],
 ];
 
@@ -84,16 +85,76 @@ function SecretField({ id, label, saved, last4, editing, onEdit, onCancel, value
   );
 }
 
+// A saved value that is not in the list (older free-text entries) is kept as an option so it is not lost.
+const withCurrent = (list, current) => (current && !list.includes(current) ? [current, ...list] : list);
+
 function AddressFields({ prefix, value, onChange, errors }) {
-  return ADDRESS_FIELDS.map(([key, label, span]) => (
-    <Field key={key} id={`${prefix}-${key}`} label={label} className={span} error={key === 'pincode' ? errors[`${prefix}Pincode`] : undefined}>
-      <input
-        id={`${prefix}-${key}`} value={value[key]} onChange={(e) => onChange(key, e.target.value)} autoComplete="off"
-        inputMode={key === 'pincode' ? 'numeric' : undefined} maxLength={key === 'pincode' ? 6 : undefined}
-        className={`field ${key === 'pincode' && errors[`${prefix}Pincode`] ? 'field-error' : ''}`}
-      />
-    </Field>
-  ));
+  const [lookup, setLookup] = useState(''); // '', 'busy' or 'missing'
+  const ctl = useRef(null);
+  useEffect(() => () => ctl.current?.abort(), []);
+
+  // Typing a full 6-digit Indian pincode fills in the city and state.
+  function onPincode(raw) {
+    const pin = raw.replace(/\D/g, '').slice(0, 6);
+    onChange('pincode', pin);
+    ctl.current?.abort();
+    if (pin.length !== 6 || value.country !== 'India') { setLookup(''); return; }
+    const c = new AbortController();
+    ctl.current = c;
+    setLookup('busy');
+    lookupPincode(pin, c.signal).then((r) => {
+      if (c.signal.aborted) return;
+      if (!r) { setLookup('missing'); return; }
+      if (r.city) onChange('city', r.city);
+      if (r.state) onChange('state', r.state);
+      setLookup('');
+    });
+  }
+
+  return ADDRESS_FIELDS.map(([key, label, span]) => {
+    const id = `${prefix}-${key}`;
+    const isIndia = value.country === 'India';
+    let control;
+    if (key === 'country') {
+      control = (
+        <Select
+          id={id} value={value.country} placeholder="Select country"
+          onChange={(v) => { onChange('country', v); if ((v === 'India') !== isIndia) onChange('state', ''); }}
+          options={withCurrent(COUNTRIES, value.country).map((c) => ({ value: c, label: c }))}
+        />
+      );
+    } else if (key === 'state' && isIndia) {
+      control = (
+        <Select
+          id={id} value={value.state} placeholder="Select state" clearLabel="Not specified" onChange={(v) => onChange('state', v)}
+          options={withCurrent(INDIAN_STATES, value.state).map((st) => ({ value: st, label: st }))}
+        />
+      );
+    } else if (key === 'pincode') {
+      control = (
+        <input
+          id={id} value={value.pincode} onChange={(e) => onPincode(e.target.value)} autoComplete="postal-code" inputMode="numeric" maxLength={6} placeholder="6-digit pincode"
+          className={`field ${errors[`${prefix}Pincode`] ? 'field-error' : ''}`}
+        />
+      );
+    } else {
+      control = (
+        <input
+          id={id} value={value[key]} onChange={(e) => onChange(key, e.target.value)} autoComplete="off"
+          inputMode={key === 'pincode' ? 'numeric' : undefined} maxLength={key === 'pincode' ? 6 : undefined}
+          className={`field ${key === 'pincode' && errors[`${prefix}Pincode`] ? 'field-error' : ''}`}
+        />
+      );
+    }
+    return (
+      <Field key={key} id={id} label={label} className={span} error={key === 'pincode' ? errors[`${prefix}Pincode`] : undefined}>
+        {control}
+        {key === 'pincode' && !errors[`${prefix}Pincode`] && lookup && (
+          <p className="mt-1.5 text-[13px] text-muted">{lookup === 'busy' ? 'Finding city and state…' : 'Could not find this pincode. Enter city and state yourself.'}</p>
+        )}
+      </Field>
+    );
+  });
 }
 
 export default function Profile() {
