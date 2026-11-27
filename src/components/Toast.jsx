@@ -44,14 +44,14 @@ function ToastItem({ toast, onClose }) {
     <div
       role={error ? 'alert' : 'status'}
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
-      className={`pointer-events-auto w-full max-w-[380px] rounded-xl border border-line bg-surface shadow-lift ${toast.leaving ? 'toast-out' : 'toast-in'}`}
+      className={`pointer-events-auto w-full max-w-[380px] rounded-xl border border-white/10 bg-ink shadow-lift ${toast.leaving ? 'toast-out' : 'toast-in'}`}
     >
       <div className="flex items-start gap-2.5 py-3 pl-3.5 pr-2.5">
-        <span className={`mt-[1px] flex-none ${error ? 'text-red-600' : 'text-emerald-600'}`}>
+        <span className={`mt-[1px] flex-none ${error ? 'text-red-400' : 'text-emerald-400'}`}>
           <Icon kind={toast.kind} />
         </span>
-        <p className="min-w-0 flex-1 text-[14px] leading-snug text-ink">{toast.text}</p>
-        <button type="button" onClick={() => onClose(toast.id)} aria-label="Dismiss" className="-mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-md text-muted transition hover:bg-soft hover:text-ink">
+        <p className="min-w-0 flex-1 text-[14px] leading-snug text-white">{toast.text}</p>
+        <button type="button" onClick={() => onClose(toast.id)} aria-label="Dismiss" className="-mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-md text-white/60 transition hover:bg-white/10 hover:text-white">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
       </div>
