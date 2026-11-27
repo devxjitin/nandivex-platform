@@ -1,0 +1,9 @@
+# Local run: docker compose up --build   then open http://localhost:8080
+services:
+  web:
+    build: .
+    image: nandivex-platform:local
+    container_name: nandivex-platform
+    ports:
+      - "8080:80"
+    restart: unless-stopped
