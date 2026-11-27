@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ThemeToggle from '../components/ThemeToggle.jsx';
 
 const highlights = [
   ['Projects and sprints', 'Every client build, its tasks and delivery dates in one view.'],
@@ -31,7 +30,7 @@ export default function Login() {
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
     const next = {};
-    if (!emailRe.test(email)) next.email = 'Enter your work email address.';
+    if (!emailRe.test(email)) next.email = 'Enter a valid email address.';
     if (password.length < 8) next.password = 'Password must be at least 8 characters.';
     setErrors(next);
     setNotice('');
@@ -80,25 +79,21 @@ export default function Login() {
 
       {/* Form panel */}
       <main className="relative flex flex-col bg-paper">
-        <div className="flex items-center justify-between px-5 py-5 sm:px-8">
-          <span className="lg:invisible">
-            <img src="/brand/logo-horizontal.png" alt="NandiVex Technologies" className="h-9 w-auto dark:hidden" />
-            <img src="/brand/logo-horizontal-white.png" alt="NandiVex Technologies" className="hidden h-9 w-auto dark:block" />
-          </span>
-          <ThemeToggle />
+        <div className="px-5 py-5 sm:px-8 lg:hidden">
+          <img src="/brand/logo-horizontal.png" alt="NandiVex Technologies" className="h-9 w-auto" />
         </div>
 
         <div className="flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">
           <div className="page-in w-full max-w-[420px]">
             <p className="label">Team sign in</p>
             <h2 className="mt-3 text-3xl sm:text-[34px]">Welcome back</h2>
-            <p className="mt-2 text-[15px] text-muted">Sign in with your NandiVex work account to continue.</p>
+            <p className="mt-2 text-[15px] text-muted">Sign in with your NandiVex account to continue.</p>
 
             <form onSubmit={onSubmit} noValidate className="mt-8 space-y-5">
               <div>
-                <label htmlFor="email" className="mb-1.5 block text-sm font-semibold">Work email</label>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-semibold">Email</label>
                 <input
-                  id="email" name="email" type="email" autoComplete="email" placeholder="you@nandivex.com"
+                  id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com"
                   aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-err' : undefined}
                   className={`field ${errors.email ? 'field-error' : ''}`}
                 />
