@@ -67,7 +67,7 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-NandiVex <noreply@nandivex.in>}
+      MAIL_FROM: ${MAIL_FROM:-NandiVex Technologies <noreply@nandivex.in>}
     ports:
       - "4010:4000"
     volumes:
