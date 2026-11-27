@@ -1,11 +1,5 @@
 import { useState } from 'react';
 
-const highlights = [
-  ['Projects and sprints', 'Every client build, its tasks and delivery dates in one view.'],
-  ['Clients and billing', 'Proposals, invoices and payments without spreadsheets.'],
-  ['Team and attendance', 'Who is working on what, leave, payroll and onboarding.'],
-];
-
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function Eye({ off }) {
@@ -53,27 +47,11 @@ export default function Login() {
         <img src="/brand/logo-horizontal-white.png" alt="NandiVex Technologies" className="h-12 w-auto self-start" />
 
         <div className="relative z-10 max-w-md">
-          <p className="label !text-white/60">NandiVex Platform</p>
-          <h1 className="mt-4 text-[44px] font-extrabold leading-[1.08]">One place to run the whole company.</h1>
-          <p className="mt-5 text-base leading-relaxed text-white/70">
-            The internal workspace for the NandiVex team: delivery, clients, people and money, kept in step.
-          </p>
-          <ul className="mt-10 space-y-5">
-            {highlights.map(([title, text]) => (
-              <li key={title} className="flex gap-4">
-                <span className="mt-1 grid h-6 w-6 flex-none place-items-center rounded-full bg-white/10 ring-1 ring-white/20">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>
-                </span>
-                <span>
-                  <span className="block font-display text-[15px] font-bold">{title}</span>
-                  <span className="block text-sm text-white/60">{text}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <h1 className="text-[44px] font-extrabold leading-[1.08]">Software, apps and automation for businesses.</h1>
+          <p className="mt-5 text-base leading-relaxed text-white/70">Welcome to NandiVex Technologies.</p>
         </div>
 
-        <p className="relative z-10 text-xs text-white/45">© {new Date().getFullYear()} NandiVex Technologies. Authorised team access only.</p>
+        <p className="relative z-10 text-xs text-white/45">© {new Date().getFullYear()} NandiVex Technologies. All rights reserved.</p>
         <img src="/brand/app-icon-violet.png" alt="" aria-hidden="true" className="float-slow pointer-events-none absolute -bottom-16 -right-16 h-72 w-72 rounded-[64px] opacity-[.12]" />
       </aside>
 
@@ -85,9 +63,9 @@ export default function Login() {
 
         <div className="flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">
           <div className="page-in w-full max-w-[420px]">
-            <p className="label">Team sign in</p>
+            <p className="label">Sign in</p>
             <h2 className="mt-3 text-3xl sm:text-[34px]">Welcome back</h2>
-            <p className="mt-2 text-[15px] text-muted">Sign in with your NandiVex account to continue.</p>
+            <p className="mt-2 text-[15px] text-muted">Enter your details to continue.</p>
 
             <form onSubmit={onSubmit} noValidate className="mt-8 space-y-5">
               <div>
@@ -133,17 +111,8 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-widest text-muted">
-              <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
-            </div>
-
-            <button type="button" className="btn-line w-full !py-3.5 text-[15px]">
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7C21.8 18.8 23 15.8 23 12.3z" /><path fill="#34A853" d="M12 23c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3A11 11 0 0 0 12 23z" /><path fill="#FBBC05" d="M5.6 13.7a6.6 6.6 0 0 1 0-4.2v-3H1.8a11 11 0 0 0 0 10.2l3.8-3z" /><path fill="#EA4335" d="M12 5.4c1.7 0 3.2.6 4.4 1.7l3.3-3.3A11 11 0 0 0 1.8 6.5l3.8 3C6.5 7.4 9 5.4 12 5.4z" /></svg>
-              Continue with Google
-            </button>
-
             <p className="mt-8 text-center text-[13px] text-muted">
-              No account? Accounts are created by an admin. Ask your team lead or write to{' '}
+              Trouble signing in? Write to{' '}
               <a className="font-semibold text-accent hover:text-accent-dark" href="mailto:contact@nandivex.com">contact@nandivex.com</a>.
             </p>
           </div>
