@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --c-paper: 255 255 255; --c-surface: 255 255 255; --c-soft: 247 243 253;
+    --c-ink: 27 20 38; --c-muted: 101 92 117; --c-line: 230 222 242;
+    --c-accent: 122 60 224; --c-accent-dark: 90 36 176; --c-tint: 237 227 251; --c-night: 21 14 36;
+  }
+  :root.dark {
+    color-scheme: dark;
+    --c-paper: 13 9 23; --c-surface: 27 19 46; --c-soft: 20 14 35;
+    --c-ink: 240 235 250; --c-muted: 168 159 188; --c-line: 49 39 72;
+    --c-accent: 154 106 242; --c-accent-dark: 172 132 248; --c-tint: 42 28 72; --c-night: 31 21 56;
+  }
+  html, body { overflow-x: clip; }
+  body { @apply bg-paper text-ink font-sans antialiased; }
+  ::selection { @apply bg-accent text-white; }
+  h1, h2, h3 { @apply font-display font-extrabold tracking-tight; }
+  h1 { letter-spacing: -0.03em; }
+}
+
+@layer components {
+  .label { @apply font-display text-xs font-bold uppercase tracking-[0.14em] text-accent; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn-solid { @apply btn border-accent bg-accent text-white shadow-lift hover:-translate-y-0.5 hover:bg-accent-dark hover:border-accent-dark disabled:hover:translate-y-0; }
+  .btn-line { @apply btn border-line bg-surface text-ink hover:border-accent hover:text-accent; }
+  .field { @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-[15px] text-ink outline-none transition placeholder:text-muted/70 focus:border-accent focus:ring-4 focus:ring-accent/15; }
+  .field-error { @apply border-red-500/70 focus:border-red-500 focus:ring-red-500/15; }
+}
+
+.page-in { animation: pagein .6s cubic-bezier(.22,1,.36,1) both; }
+@keyframes pagein { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(12deg); } 50% { transform: translateY(-10px) rotate(12deg); } }
+.float-slow { animation: float 7s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .page-in, .float-slow { animation: none; } }
