@@ -1,4 +1,17 @@
-# Local run: docker compose up --build   then open http://localhost:8080
+# Local run of the whole platform on Docker.
+#
+#   docker compose up -d --build   start everything (first run installs API packages, takes a minute)
+#   docker compose logs -f api     watch the API
+#   docker compose down            stop (data is kept)   |   docker compose down -v   stop and wipe data
+#
+# Web app (production build) http://localhost:8080
+# Web app (dev, hot reload)  npm run dev  ->  http://localhost:5180  (proxies /api to the API)
+# API                        http://localhost:4010/health
+# Mailpit (catches every email the API sends)  http://localhost:8025
+# Database                   localhost:5441  (user nandivex, password nandivex, database nandivex)
+#
+# Secrets and the first admin login come from .env (copy .env.example). Emails are really sent over
+# SMTP, to Mailpit here, so nothing leaves your machine.
 services:
   web:
     build: .
@@ -7,3 +20,63 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: nandivex-db
+    environment:
+      POSTGRES_USER: nandivex
+      POSTGRES_PASSWORD: nandivex
+      POSTGRES_DB: nandivex
+    ports:
+      - "5441:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nandivex -d nandivex"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: nandivex-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  api:
+    image: node:22-alpine
+    container_name: nandivex-api
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      DATABASE_URL: postgresql://nandivex:nandivex@db:5432/nandivex
+      WEB_URL: http://localhost:5180
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      MAIL_FROM: NandiVex <support@nandivex.com>
+    ports:
+      - "4010:4000"
+    volumes:
+      - ./api:/app
+      - api_node_modules:/app/node_modules
+    # Prisma's query engine needs OpenSSL on Alpine. Migrate, create the first admin, then run with reload.
+    command: >
+      sh -c "apk add --no-cache openssl >/dev/null &&
+             npm install --no-audit --no-fund &&
+             npx prisma generate &&
+             npx prisma migrate deploy &&
+             npx tsx src/scripts/seed-admin.ts &&
+             npx tsx watch src/main.ts"
+
+volumes:
+  dbdata:
+  api_node_modules:
