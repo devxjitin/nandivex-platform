@@ -1,0 +1,88 @@
+/* Admin shell: fixed sidebar (collapses to icons), top bar, account chip in the sidebar. */
+.shell { --sb: 260px; --bar: 64px; min-height: 100vh; background: rgb(var(--c-soft)); }
+.shell-sidebar { display: flex; flex-direction: column; background: rgb(var(--c-surface)); border-right: 1px solid rgb(var(--c-line)); padding: 16px 12px; }
+.shell-head { padding: 4px 10px 18px; margin-bottom: 14px; border-bottom: 1px solid rgb(var(--c-line)); overflow: hidden; }
+.shell-brand { display: flex; align-items: center; height: 36px; }
+.shell-logo { height: 34px; width: auto; max-width: none; }
+.shell-icon { display: none; height: 34px; width: 34px; border-radius: 10px; }
+.shell-nav { display: flex; flex-direction: column; gap: 1px; }
+.shell-label { padding: 2px 12px 6px; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-muted) / .75); white-space: nowrap; overflow: hidden; max-height: 40px; }
+.shell-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; font-size: .9rem; font-weight: 500; color: rgb(var(--c-ink) / .82); transition: background-color .15s ease, color .15s ease; }
+.shell-item:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink)); }
+.shell-item.active { background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-weight: 600; }
+.shell-ico { display: grid; flex: none; place-items: center; width: 20px; height: 20px; }
+.shell-item svg { color: rgb(var(--c-muted)); }
+.shell-item.active svg { color: rgb(var(--c-accent-dark)); }
+
+.shell-foot { position: relative; margin-top: auto; display: grid; gap: 1px; padding-top: 10px; border-top: 1px solid rgb(var(--c-line)); }
+.shell-chip { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid rgb(var(--c-line)); border-radius: 12px; background: rgb(var(--c-soft)); font: inherit; text-align: left; color: inherit; cursor: pointer; transition: background-color .12s ease, border-color .12s ease; }
+.shell-chip:hover, .shell-chip[aria-expanded='true'] { background: rgb(var(--c-surface)); border-color: rgb(var(--c-accent) / .45); }
+.shell-chip:focus-visible, .shell-toggle:focus-visible, .shell-menu-item:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
+.shell-avatar { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: rgb(var(--c-accent)); color: #fff; font-family: "Plus Jakarta Sans", Inter, sans-serif; font-weight: 700; font-size: .95rem; }
+.shell-avatar-lg { width: 44px; height: 44px; font-size: 1.1rem; }
+.shell-meta { display: grid; min-width: 0; line-height: 1.25; }
+.shell-meta strong, .shell-meta small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shell-meta strong { font-size: .88rem; font-weight: 600; }
+.shell-meta small { font-size: .74rem; color: rgb(var(--c-muted)); }
+.shell-caret { display: grid; margin-left: auto; color: rgb(var(--c-muted)); transform: rotate(-90deg); transition: transform .15s ease; }
+.shell-caret.open { transform: rotate(90deg); }
+.shell-copy { display: block; padding: 8px 12px 0; font-size: .74rem; color: rgb(var(--c-muted) / .75); white-space: nowrap; overflow: hidden; }
+
+.shell-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 60; display: grid; gap: 2px; padding: 8px; background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-line)); border-radius: 16px; box-shadow: 0 12px 32px -8px rgba(27, 20, 38, .18), 0 2px 6px rgba(27, 20, 38, .06); transform-origin: bottom left; animation: shell-pop .14s ease both; }
+@keyframes shell-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.shell-menu-head { display: flex; align-items: center; gap: 12px; padding: 10px 10px 12px; margin-bottom: 6px; border-bottom: 1px solid rgb(var(--c-line)); }
+.shell-menu-who { display: grid; gap: 1px; min-width: 0; }
+.shell-menu-who strong { font-size: .92rem; }
+.shell-menu-who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; color: rgb(var(--c-muted)); }
+.shell-menu-who em { justify-self: start; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-style: normal; font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.shell-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: .9rem; font-weight: 500; text-align: left; color: rgb(var(--c-ink) / .85); cursor: pointer; }
+.shell-menu-item svg { color: rgb(var(--c-muted)); }
+.shell-menu-danger:hover { background: rgb(239 68 68 / .08); color: rgb(220 38 38); }
+.shell-menu-danger:hover svg { color: rgb(220 38 38); }
+
+.shell-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; gap: 14px; height: var(--bar); padding: 0 18px; background: rgb(var(--c-surface)); border-bottom: 1px solid rgb(var(--c-line)); }
+.shell-toggle { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid rgb(var(--c-line)); border-radius: 12px; background: rgb(var(--c-surface)); color: rgb(var(--c-ink)); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.shell-toggle:hover { background: rgb(var(--c-soft)); border-color: rgb(var(--c-accent) / .45); }
+.shell-crumbs { display: flex; align-items: center; gap: 6px; font-size: .86rem; font-weight: 500; color: rgb(var(--c-muted)); min-width: 0; white-space: nowrap; }
+.shell-crumbs span { display: inline-flex; align-items: center; gap: 6px; }
+.shell-crumbs .current { font-weight: 600; color: rgb(var(--c-ink)); }
+.shell-main { min-width: 0; padding-top: var(--bar); }
+.shell-scrim { position: fixed; inset: 0; z-index: 35; background: rgba(27, 20, 38, .4); backdrop-filter: blur(2px); }
+
+/* Small screens: the sidebar is a drawer opened from the top bar. */
+@media (max-width: 1023px) {
+  .shell-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 270px; transform: translateX(-100%); transition: transform .22s cubic-bezier(.16, 1, .3, 1); box-shadow: 0 18px 40px -12px rgba(27, 20, 38, .3); }
+  .shell-open .shell-sidebar { transform: none; }
+}
+
+/* Large screens: fixed sidebar; collapsed it shows icons only and the text fades away. */
+@media (min-width: 1024px) {
+  .shell { padding-left: var(--sb); }
+  .shell-collapsed { --sb: 68px; }
+  .shell, .shell-bar, .shell-sidebar { transition-duration: .28s; transition-timing-function: cubic-bezier(.4, 0, .2, 1); }
+  .shell { transition-property: padding-left; }
+  .shell-bar { left: var(--sb); transition-property: left; }
+  .shell-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sb); height: 100vh; transition-property: width, padding; }
+  .shell-collapsed .shell-sidebar { padding-inline: 10px; }
+
+  .shell-item > span:not(.shell-ico), .shell-meta, .shell-caret, .shell-copy { max-width: 220px; opacity: 1; transition: opacity .18s ease .08s, max-width .28s cubic-bezier(.4, 0, .2, 1); }
+  .shell-item { transition: padding .28s cubic-bezier(.4, 0, .2, 1), background-color .15s ease, color .15s ease; }
+  .shell-label { transition: opacity .15s ease, max-height .28s cubic-bezier(.4, 0, .2, 1), padding .28s cubic-bezier(.4, 0, .2, 1); }
+  .shell-head { transition: padding .28s cubic-bezier(.4, 0, .2, 1); }
+  .shell-chip { transition: padding .28s cubic-bezier(.4, 0, .2, 1), gap .28s cubic-bezier(.4, 0, .2, 1), background-color .12s ease, border-color .12s ease; }
+
+  .shell-collapsed .shell-item > span:not(.shell-ico), .shell-collapsed .shell-meta, .shell-collapsed .shell-caret, .shell-collapsed .shell-copy { max-width: 0; opacity: 0; transition: opacity .1s ease, max-width .28s cubic-bezier(.4, 0, .2, 1); }
+  .shell-collapsed .shell-label { opacity: 0; max-height: 0; padding-block: 0; }
+  .shell-collapsed .shell-head { padding-inline: 7px; }
+  .shell-collapsed .shell-logo { display: none; }
+  .shell-collapsed .shell-icon { display: block; }
+  .shell-collapsed .shell-item { padding-inline: 14px; }
+  .shell-collapsed .shell-chip { gap: 0; padding: 5px; }
+  .shell-collapsed .shell-copy { padding-inline: 0; }
+  /* Beside the icon strip instead of above it, so the narrow sidebar does not squeeze it. */
+  .shell-collapsed .shell-menu { left: calc(100% + 18px); right: auto; bottom: 0; width: 264px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell, .shell-bar, .shell-sidebar, .shell-sidebar * { transition: none !important; }
+  .shell-menu { animation: none; }
+}
