@@ -11,6 +11,8 @@ import { APP_ENABLED } from './lib/flags.js';
 const Employees = APP_ENABLED ? lazy(() => import('./pages/admin/Employees.jsx')) : null;
 const AddEmployee = APP_ENABLED ? lazy(() => import('./pages/admin/AddEmployee.jsx')) : null;
 const ChangePassword = APP_ENABLED ? lazy(() => import('./pages/ChangePassword.jsx')) : null;
+const ForgotPassword = APP_ENABLED ? lazy(() => import('./pages/ForgotPassword.jsx')) : null;
+const ResetPassword = APP_ENABLED ? lazy(() => import('./pages/ResetPassword.jsx')) : null;
 const Home = APP_ENABLED ? lazy(() => import('./pages/Home.jsx')) : null;
 
 createRoot(document.getElementById('root')).render(
@@ -22,6 +24,8 @@ createRoot(document.getElementById('root')).render(
             <Route path="/" element={<Login />} />
             {APP_ENABLED && (
               <>
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/change-password" element={<RequireAuth allowMustChange><ChangePassword /></RequireAuth>} />
                 <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
                 <Route path="/admin" element={<RequireAuth manager><Employees /></RequireAuth>} />
