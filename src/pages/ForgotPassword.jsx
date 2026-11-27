@@ -35,7 +35,7 @@ export default function ForgotPassword() {
         <p className="label">Check your email</p>
         <h2 className="mt-3 text-3xl sm:text-[34px]">Reset link on its way</h2>
         <p className="mt-2 text-[15px] text-muted">
-          If <span className="font-semibold text-ink">{sentTo}</span> has an account, we have sent a link to reset the password. It works once and expires in 30 minutes.
+          We have sent a link to <span className="font-semibold text-ink">{sentTo}</span> to reset your password. It works once and expires in 30 minutes.
         </p>
         <p className="mt-4 text-[13px] text-muted">Nothing in your inbox? Check the spam folder, or try again in a minute.</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
