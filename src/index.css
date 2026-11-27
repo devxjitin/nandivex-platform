@@ -9,12 +9,6 @@
     --c-ink: 27 20 38; --c-muted: 101 92 117; --c-line: 230 222 242;
     --c-accent: 122 60 224; --c-accent-dark: 90 36 176; --c-tint: 237 227 251; --c-night: 21 14 36;
   }
-  :root.dark {
-    color-scheme: dark;
-    --c-paper: 13 9 23; --c-surface: 27 19 46; --c-soft: 20 14 35;
-    --c-ink: 240 235 250; --c-muted: 168 159 188; --c-line: 49 39 72;
-    --c-accent: 154 106 242; --c-accent-dark: 172 132 248; --c-tint: 42 28 72; --c-night: 31 21 56;
-  }
   html, body { overflow-x: clip; }
   body { @apply bg-paper text-ink font-sans antialiased; }
   ::selection { @apply bg-accent text-white; }
