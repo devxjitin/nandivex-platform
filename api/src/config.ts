@@ -5,6 +5,8 @@ const schema = z.object({
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  // 32-byte key as 64 hex characters. Encrypts PAN and bank account numbers. Generate with: openssl rand -hex 32
+  DATA_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/i, 'DATA_ENCRYPTION_KEY must be 64 hex characters'),
   // Where the web app lives. Used for CORS and for the sign-in link inside emails.
   WEB_URL: z.string().url().default('http://localhost:5180'),
   SMTP_HOST: z.string().default('localhost'),

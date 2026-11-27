@@ -20,6 +20,9 @@
 .shell-chip:focus-visible, .shell-toggle:focus-visible, .shell-menu-item:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
 .shell-avatar { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: rgb(var(--c-accent)); color: #fff; font-family: "Plus Jakarta Sans", Inter, sans-serif; font-weight: 700; font-size: .95rem; }
 .shell-avatar-lg { width: 44px; height: 44px; font-size: 1.1rem; }
+img.shell-avatar { display: block; background: rgb(var(--c-tint)); }
+a.shell-menu-item { text-decoration: none; }
+a.shell-menu-item:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink)); }
 .shell-meta { display: grid; min-width: 0; line-height: 1.25; }
 .shell-meta strong, .shell-meta small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shell-meta strong { font-size: .88rem; font-weight: 600; }
@@ -49,7 +52,8 @@
 .shell-crumb-link { border-radius: 6px; transition: color .15s ease; }
 .shell-crumb-link:hover { color: rgb(var(--c-accent)); }
 .shell-crumb-link:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
-.shell-role { margin-left: auto; max-width: 180px; padding: 5px 14px; border-radius: 999px; background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-size: .8rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shell-right { display: flex; align-items: center; gap: 14px; margin-left: auto; min-width: 0; }
+.shell-actions { display: flex; align-items: center; gap: 14px; }
 .shell-main { min-width: 0; padding-top: var(--bar); }
 .shell-scrim { position: fixed; inset: 0; z-index: 35; background: rgba(27, 20, 38, .4); backdrop-filter: blur(2px); }
 

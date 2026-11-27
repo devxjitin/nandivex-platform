@@ -24,3 +24,15 @@ export async function listRoles() {
   const { roles } = await api('/roles');
   return roles;
 }
+
+/** Everything an employee has saved in their profile. The PAN and account number come back masked. */
+export async function getEmployeeProfile(id) {
+  const { profile } = await api(`/employees/${id}/profile`);
+  return profile;
+}
+
+/** The full PAN or bank account number. Each call is recorded on the server. field: 'pan' | 'bankAccount' */
+export async function revealSecret(id, field) {
+  const { value } = await api(`/employees/${id}/profile/reveal`, { method: 'POST', body: { field } });
+  return value;
+}

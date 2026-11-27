@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import AuthShell from '../components/AuthShell.jsx';
+import Checkbox from '../components/Checkbox.jsx';
 import { APP_ENABLED } from '../lib/flags.js';
 import { homeFor, useSession } from '../lib/session.jsx';
 
@@ -95,10 +96,7 @@ export default function Login() {
           {errors.password && <p id="pw-err" className="mt-1.5 text-[13px] text-red-500">{errors.password}</p>}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-muted">
-          <input type="checkbox" name="remember" className="h-4 w-4 rounded border-line accent-[rgb(var(--c-accent))]" />
-          Keep me signed in on this device
-        </label>
+        <Checkbox name="remember" className="text-muted">Keep me signed in on this device</Checkbox>
 
         {formError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{formError}</p>}
         {notice && <p role="status" className="rounded-xl border border-accent/30 bg-tint px-4 py-3 text-[13px] text-ink">{notice}</p>}

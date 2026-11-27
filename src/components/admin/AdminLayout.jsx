@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useSession } from '../../lib/session.jsx';
+import Avatar from '../Avatar.jsx';
+import NotificationBell from '../NotificationBell.jsx';
+import { homeFor, isManager, useSession } from '../../lib/session.jsx';
 import './shell.css';
 
 /* Fixed sidebar that collapses to icons, a slim top bar with the toggle and breadcrumbs, and the
@@ -21,6 +23,22 @@ function PeopleIcon() {
       <circle cx="9" cy="8" r="3.5" />
       <path d="M2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5" />
       <path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.8c1.8.7 3.1 2.4 3.5 5.2" />
+    </svg>
+  );
+}
+function UserIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5c.8-4 3.7-6 7.5-6s6.7 2 7.5 6" />
+    </svg>
+  );
+}
+function HomeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
+      <path d="M3.5 11 12 4l8.5 7" />
+      <path d="M5.5 10v9.5h13V10" />
     </svg>
   );
 }
@@ -46,9 +64,13 @@ function LogoutIcon() {
   );
 }
 
+/** Breadcrumb trail per page. Items with `to` link back. */
 const CRUMBS = [
-  { match: (p) => p.startsWith('/admin/employees/new'), trail: ['Employees', 'Add employee'] },
-  { match: (p) => p.startsWith('/admin'), trail: ['Employees'] },
+  { match: (p) => p.startsWith('/admin/employees/new'), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Add employee' }] },
+  { match: (p) => /^\/admin\/employees\/[^/]+/.test(p), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Details' }] },
+  { match: (p) => p.startsWith('/admin'), trail: [{ label: 'Employees' }] },
+  { match: (p) => p.startsWith('/profile'), trail: [{ label: 'Profile' }] },
+  { match: (p) => p.startsWith('/home'), trail: [{ label: 'Home' }] },
 ];
 
 export default function AdminLayout({ children }) {
@@ -59,8 +81,12 @@ export default function AdminLayout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const footRef = useRef(null);
 
-  const initial = (user?.name || 'A').trim()[0]?.toUpperCase();
-  const trail = (CRUMBS.find((c) => c.match(pathname)) || CRUMBS[CRUMBS.length - 1]).trail;
+  const manager = isManager(user);
+  const nav = [
+    { to: '/home', label: 'Home', icon: <HomeIcon />, active: pathname.startsWith('/home') },
+    ...(manager ? [{ to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') }] : []),
+  ];
+  const trail = (CRUMBS.find((c) => c.match(pathname)) || CRUMBS[0]).trail;
 
   // A new page closes the mobile drawer and the account menu.
   useEffect(() => { setOpen(false); setMenuOpen(false); }, [pathname]);
@@ -90,31 +116,37 @@ export default function AdminLayout({ children }) {
     <div className={`shell${collapsed ? ' shell-collapsed' : ''}${open ? ' shell-open' : ''}`}>
       <aside className="shell-sidebar" aria-label="Main navigation">
         <div className="shell-head">
-          <Link to="/admin" aria-label="NandiVex Technologies" className="shell-brand">
+          <Link to={user ? homeFor(user) : '/'} aria-label="NandiVex Technologies" className="shell-brand">
             <img className="shell-logo" src="/brand/logo-horizontal.png" alt="NandiVex Technologies" />
             <img className="shell-icon" src="/brand/app-icon-violet.png" alt="" aria-hidden="true" />
           </Link>
         </div>
 
-        <nav className="shell-nav" aria-label="Admin">
+        <nav className="shell-nav" aria-label="Main">
           <div className="shell-label">Menu</div>
-          <Link to="/admin" className={`shell-item${pathname.startsWith('/admin') ? ' active' : ''}`} aria-current={pathname.startsWith('/admin') ? 'page' : undefined} title="Employees">
-            <span className="shell-ico"><PeopleIcon /></span>
-            <span>Employees</span>
-          </Link>
+          {nav.map((item) => (
+            <Link key={item.to} to={item.to} className={`shell-item${item.active ? ' active' : ''}`} aria-current={item.active ? 'page' : undefined} title={item.label}>
+              <span className="shell-ico">{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
         </nav>
 
         <div className="shell-foot" ref={footRef}>
           {menuOpen && (
             <div className="shell-menu" role="menu" aria-label="Account">
               <div className="shell-menu-head">
-                <span className="shell-avatar shell-avatar-lg">{initial}</span>
+                <Avatar user={user} className="shell-avatar shell-avatar-lg" />
                 <span className="shell-menu-who">
                   <strong>{user?.name}</strong>
                   <small>{user?.email}</small>
                   <em>{user?.role}</em>
                 </span>
               </div>
+              <Link to="/profile" role="menuitem" className="shell-menu-item">
+                <UserIcon size={16} />
+                <span>Profile</span>
+              </Link>
               <button type="button" role="menuitem" className="shell-menu-item shell-menu-danger" onClick={signOut}>
                 <LogoutIcon />
                 <span>Sign out</span>
@@ -122,7 +154,7 @@ export default function AdminLayout({ children }) {
             </div>
           )}
           <button type="button" className="shell-chip" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)} title={user?.name}>
-            <span className="shell-avatar">{initial}</span>
+            <Avatar user={user} className="shell-avatar" />
             <span className="shell-meta">
               <strong>{user?.name}</strong>
               <small>{user?.role}</small>
@@ -140,15 +172,18 @@ export default function AdminLayout({ children }) {
             <PanelIcon />
           </button>
           <nav className="shell-crumbs" aria-label="Breadcrumb">
-            <span>NandiVex</span>
             {trail.map((c, i) => (
-              <span key={c} className={i === trail.length - 1 ? 'current' : undefined}>
-                <ChevronIcon />
-                {i === trail.length - 1 ? c : <Link to="/admin" className="shell-crumb-link">{c}</Link>}
+              <span key={c.label} className={i === trail.length - 1 ? 'current' : undefined}>
+                {i > 0 && <ChevronIcon />}
+                {c.to ? <Link to={c.to} className="shell-crumb-link">{c.label}</Link> : c.label}
               </span>
             ))}
           </nav>
-          {user?.role && <span className="shell-role" title="Your role">{user.role}</span>}
+          <div className="shell-right">
+            {/* A page can put its own buttons here (see Profile) through a portal. */}
+            <div id="shell-actions" className="shell-actions" />
+            <NotificationBell />
+          </div>
         </header>
         <main className="min-w-0 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">{children}</main>
       </div>

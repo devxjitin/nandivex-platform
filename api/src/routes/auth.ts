@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { clearSession, requireAuth, setSession, toDto } from '../auth';
 import { prisma } from '../db';
 import { sendResetLinkEmail } from '../mail';
+import { notify, notifyManagers } from '../notify';
 import { burnVerify, hashPassword, passwordSchema, verifyPassword } from '../password';
 
 export const authRouter = Router();
@@ -38,6 +39,9 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
     data: { status: 'ACTIVE', lastLoginAt: new Date() },
   });
   setSession(res, updated.id);
+  if (user.status === 'INVITED') {
+    await notifyManagers({ type: 'first_signin', title: `${user.name} signed in for the first time`, link: `/admin/employees/${user.id}` }, user.id);
+  }
   return res.json({ user: toDto(updated) });
 });
 
@@ -68,6 +72,7 @@ authRouter.post('/change-password', requireAuth, async (req, res) => {
     where: { id: me.id },
     data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
   });
+  await notify([me.id], { type: 'password_changed', title: 'Your password was changed', body: 'If this was not you, tell an admin right away.' });
   return res.json({ user: toDto(updated) });
 });
 
@@ -146,5 +151,6 @@ authRouter.post('/reset-password', resetLimiter, async (req, res) => {
     }),
     prisma.passwordResetToken.deleteMany({ where: { userId: record.userId } }),
   ]);
+  await notify([record.userId], { type: 'password_changed', title: 'Your password was changed', body: 'If this was not you, tell an admin right away.' });
   return res.json({ ok: true });
 });

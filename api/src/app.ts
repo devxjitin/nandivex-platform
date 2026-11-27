@@ -6,6 +6,8 @@ import { config } from './config';
 import { prisma } from './db';
 import { authRouter } from './routes/auth';
 import { employeesRouter } from './routes/employees';
+import { notificationsRouter } from './routes/notifications';
+import { profileRouter } from './routes/profile';
 import { rolesRouter } from './routes/roles';
 
 export function createApp() {
@@ -28,10 +30,15 @@ export function createApp() {
 
   app.use('/auth', authRouter);
   app.use('/employees', employeesRouter);
+  app.use('/profile', profileRouter);
+  app.use('/notifications', notificationsRouter);
   app.use('/roles', rolesRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found.' }));
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = (err as { status?: number })?.status;
+    if (status === 413) return res.status(413).json({ error: 'That file is too large.' });
+    if (status === 400) return res.status(400).json({ error: 'Could not read that request.' });
     console.error(err);
     res.status(500).json({ error: 'Something went wrong. Please try again.' });
   });

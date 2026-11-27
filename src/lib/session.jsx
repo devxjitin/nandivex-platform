@@ -38,7 +38,7 @@ export const isManager = (user) => !!user && isManagerRole(user.role);
 /** Where a signed-in user belongs. */
 export function homeFor(user) {
   if (user.mustChangePassword) return '/change-password';
-  return isManager(user) ? '/admin' : '/home';
+  return '/home';
 }
 
 /** Route guard. `manager` also requires an admin-level role. */

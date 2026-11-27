@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
+import Checkbox from '../../components/Checkbox.jsx';
+import Select from '../../components/Select.jsx';
 import { createEmployee, listRoles } from '../../lib/employeesApi.js';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -113,9 +115,7 @@ export default function AddEmployee() {
 
   return (
     <AdminLayout>
-      <h1 className="text-3xl sm:text-4xl">Add employee</h1>
-
-      <form onSubmit={submit} noValidate className="mt-8 rounded-2xl border border-line bg-surface shadow-card">
+      <form onSubmit={submit} noValidate className="rounded-2xl border border-line bg-surface shadow-card">
         <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
           <div>
             <label htmlFor="emp-name" className="mb-1.5 block text-sm font-semibold">Full name<Req /></label>
@@ -131,11 +131,11 @@ export default function AddEmployee() {
 
           <div>
             <label htmlFor="emp-role" className="mb-1.5 block text-sm font-semibold">Role<Req /></label>
-            <select id="emp-role" value={roleChoice} onChange={onRoleChange} aria-invalid={!!errors.role && roleChoice !== OTHER} aria-describedby={errors.role && roleChoice !== OTHER ? 'emp-role-err' : undefined} className={cls('role')}>
-              <option value="" disabled>Select a role</option>
-              {savedRoles.map((r) => <option key={r} value={r}>{r}</option>)}
-              <option value={OTHER}>Other…</option>
-            </select>
+            <Select
+              id="emp-role" value={roleChoice} onChange={(v) => onRoleChange({ target: { value: v } })} placeholder="Select a role"
+              options={[...savedRoles.map((r) => ({ value: r, label: r })), { value: OTHER, label: 'Other…' }]}
+              invalid={!!errors.role && roleChoice !== OTHER} aria-describedby={errors.role && roleChoice !== OTHER ? 'emp-role-err' : undefined}
+            />
             {roleChoice !== OTHER && <FieldError id="emp-role-err">{errors.role}</FieldError>}
           </div>
 
@@ -156,8 +156,8 @@ export default function AddEmployee() {
               <input id="emp-password" type={showPw ? 'text' : 'password'} value={values.password} onChange={set('password')} autoComplete="new-password" placeholder="Set a password" aria-invalid={!!errors.password} aria-describedby="emp-pw-strength" className={`${cls('password')} pr-16 font-mono`} />
               <button type="button" onClick={() => setShowPw((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-muted transition hover:text-accent">{showPw ? 'Hide' : 'Show'}</button>
             </div>
-            <div id="emp-pw-strength" aria-live="polite" className="mt-2.5 min-h-[34px]">
-              {strength && (
+            <div id="emp-pw-strength" aria-live="polite" className={strength ? 'mt-2.5 min-h-[34px]' : ''}>
+              {strength ? (
                 <>
                   <div className="flex gap-1.5" aria-hidden="true">
                     {[1, 2, 3, 4].map((n) => (
@@ -169,15 +169,13 @@ export default function AddEmployee() {
                     {strength.hint && <span className="text-muted"> · {strength.hint}</span>}
                   </p>
                 </>
+              ) : (
+                <FieldError id="emp-pw-err">{errors.password}</FieldError>
               )}
             </div>
-            {!strength && <FieldError id="emp-pw-err">{errors.password}</FieldError>}
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
-            <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="h-4 w-4 flex-none rounded border-line accent-[rgb(var(--c-accent))]" />
-            <span>Ask them to choose a new password at first sign-in</span>
-          </label>
+          <Checkbox checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="sm:col-span-2">Ask them to choose a new password at first sign-in</Checkbox>
         </div>
 
         {formError && (
