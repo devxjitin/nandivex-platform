@@ -11,8 +11,7 @@ const SITE_CAREERS_URL = 'https://nandivex.com/careers';
 
 const icon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
 const PlusIcon = () => <svg {...icon} strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>;
-const UpIcon = () => <svg {...icon}><path d="M6 15l6-6 6 6" /></svg>;
-const DownIcon = () => <svg {...icon}><path d="M6 9l6 6 6-6" /></svg>;
+const GripIcon = () => <svg {...icon} strokeWidth="3"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" /></svg>;
 const TrashIcon = () => <svg {...icon}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>;
 const EditIcon = () => <svg {...icon}><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3zM14 7l3 3" /></svg>;
 const ExternalIcon = () => <svg {...icon}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
@@ -53,15 +52,22 @@ export default function Careers() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location, navigate, toast]);
 
-  // Moves a role past its neighbour in the list being shown; the order is saved at once.
-  async function move(role, dir) {
-    const i = shown.findIndex((r) => r.id === role.id);
-    const other = shown[i + dir];
-    if (!other || busy) return;
+  // Drag a card (by its grip) onto another to move it there. The grip also answers the arrow keys.
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
+
+  // Moves `role` to the place of `target` among the roles being shown; the order is saved at once.
+  async function moveTo(role, target) {
+    if (!target || role.id === target.id || busy) return;
+    const from = shown.findIndex((r) => r.id === role.id);
+    const to = shown.findIndex((r) => r.id === target.id);
+    if (from < 0 || to < 0) return;
+    const nextShown = shown.slice();
+    nextShown.splice(to, 0, nextShown.splice(from, 1)[0]);
+    // The shown roles keep the slots they had in the full list, so a filtered view never disturbs hidden ones.
+    const slots = roles.map((r, i) => (shown.some((s) => s.id === r.id) ? i : -1)).filter((i) => i >= 0);
     const ids = roles.map((r) => r.id);
-    const a = ids.indexOf(role.id);
-    const b = ids.indexOf(other.id);
-    [ids[a], ids[b]] = [ids[b], ids[a]];
+    slots.forEach((slot, k) => { ids[slot] = nextShown[k].id; });
     const before = roles;
     setRoles(ids.map((id) => roles.find((r) => r.id === id)));
     setBusy(true);
@@ -127,11 +133,19 @@ export default function Careers() {
             ) : (
               <ul className="divide-y divide-line">
                 {shown.map((r, i) => (
-                  <li key={r.id} className="flex items-center gap-3 px-4 py-3.5 sm:px-6">
-                    <div className="flex flex-none flex-col">
-                      <button type="button" onClick={() => move(r, -1)} disabled={i === 0 || busy} aria-label={`Move ${r.title} up`} className={`${iconBtn} !h-7 !w-9`}><UpIcon /></button>
-                      <button type="button" onClick={() => move(r, 1)} disabled={i === shown.length - 1 || busy} aria-label={`Move ${r.title} down`} className={`${iconBtn} !h-7 !w-9`}><DownIcon /></button>
-                    </div>
+                  <li key={r.id}
+                    onDragOver={(e) => { if (dragId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overId !== r.id) setOverId(r.id); } }}
+                    onDrop={(e) => { e.preventDefault(); moveTo(shown.find((x) => x.id === dragId), r); setDragId(null); setOverId(null); }}
+                    className={`flex items-center gap-3 px-4 py-3.5 transition sm:px-6 ${dragId === r.id ? 'opacity-40' : ''} ${overId === r.id && dragId && dragId !== r.id ? 'bg-tint/60 ring-2 ring-inset ring-accent' : ''}`}>
+                    <button type="button" disabled={busy} aria-label={`Move ${r.title}. Drag, or use the up and down arrow keys.`} title="Drag to reorder"
+                      draggable={!busy}
+                      onDragStart={(e) => { setDragId(r.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.id); const row = e.currentTarget.closest('li'); if (row) e.dataTransfer.setDragImage(row, 24, 24); }}
+                      onDragEnd={() => { setDragId(null); setOverId(null); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') { e.preventDefault(); moveTo(r, shown[i - 1]); }
+                        if (e.key === 'ArrowDown') { e.preventDefault(); moveTo(r, shown[i + 1]); }
+                      }}
+                      className={`${iconBtn} cursor-grab touch-none active:cursor-grabbing`}><GripIcon /></button>
                     <Link to={`/admin/careers/${r.id}`} className="min-w-0 flex-1 text-left">
                       <span className="block truncate font-semibold hover:text-accent">{r.title}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
