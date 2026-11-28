@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
+import Dialog from '../../components/admin/Dialog.jsx';
 import Select from '../../components/Select.jsx';
-import { addCareerRole, getCareers, saveCareerRole } from '../../lib/careersApi.js';
+import { addCareerRole, deleteCareerRole, getCareers, saveCareerRole } from '../../lib/careersApi.js';
 import { KINDS, STATUSES, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
 
 const icon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
@@ -87,8 +88,9 @@ function ListEditor({ id, value, onChange, placeholder, invalid, max = 15 }) {
   );
 }
 
-function RoleForm({ initial, isNew, onSave }) {
+function RoleForm({ initial, isNew, onSave, onDelete }) {
   const [r, setR] = useState(() => ({ ...emptyRole(), ...initial }));
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const blockLeave = useRef(true);
   const [errors, setErrors] = useState({});
   const [attempted, setAttempted] = useState(false);
@@ -125,6 +127,21 @@ function RoleForm({ initial, isNew, onSave }) {
       await onSave(cleanRole(r));
     } catch (err) {
       blockLeave.current = true;
+      setFormError(err.message);
+      setBusy(false);
+    }
+  }
+
+  const closeDelete = useCallback(() => setConfirmDelete(false), []);
+  async function remove() {
+    setBusy(true);
+    setFormError('');
+    try {
+      blockLeave.current = false;
+      await onDelete();
+    } catch (err) {
+      blockLeave.current = true;
+      setConfirmDelete(false);
       setFormError(err.message);
       setBusy(false);
     }
@@ -188,12 +205,28 @@ function RoleForm({ initial, isNew, onSave }) {
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-line px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <p className="text-[13px] text-muted">Changes show on the website as soon as you save.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {!isNew && (
+            <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className="inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold text-red-600 transition hover:bg-red-500/10 disabled:opacity-40">
+              <TrashIcon /> Delete role
+            </button>
+          )}
+          <p className="text-[13px] text-muted">Changes show on the website as soon as you save.</p>
+        </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row">
           <Link to="/admin/careers" className="btn-line">Cancel</Link>
           <button type="submit" disabled={busy || (!dirty && !isNew)} className="btn-solid">{busy ? 'Saving…' : isNew ? 'Add role' : 'Save role'}</button>
         </div>
       </div>
+
+      {confirmDelete && (
+        <Dialog title="Delete this role?" description={`"${r.title || 'This role'}" will disappear from the website at once. This cannot be undone. If you may want it again, set it to Hidden instead.`} onClose={closeDelete}>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button type="button" onClick={closeDelete} className="btn-line">Cancel</button>
+            <button type="button" onClick={remove} disabled={busy} className="btn border-red-600 bg-red-600 text-white hover:bg-red-700">{busy ? 'Deleting…' : 'Delete'}</button>
+          </div>
+        </Dialog>
+      )}
     </form>
   );
 }
@@ -220,6 +253,11 @@ export default function CareerRole() {
     navigate('/admin/careers', { state: { toast: 'Role saved' } });
   }
 
+  async function onDelete() {
+    await deleteCareerRole(id);
+    navigate('/admin/careers', { state: { toast: 'Role deleted' } });
+  }
+
   return (
     <AdminLayout>
       {loadError && (
@@ -229,7 +267,7 @@ export default function CareerRole() {
         </div>
       )}
       {!initial && !loadError && <p className="p-8 text-center text-sm text-muted">Loading…</p>}
-      {initial && <RoleForm key={id || 'new'} initial={initial} isNew={isNew} onSave={onSave} />}
+      {initial && <RoleForm key={id || 'new'} initial={initial} isNew={isNew} onSave={onSave} onDelete={onDelete} />}
     </AdminLayout>
   );
 }
