@@ -131,3 +131,46 @@ employeesRouter.post('/:id/profile/reveal', async (req, res) => {
   });
   return res.json({ value });
 });
+
+// --- Account details, for managers -----------------------------------------------------------
+// An admin sets a person's name, email and role. What the person fills in on their own profile (date of birth,
+// address, PAN, bank details, picture) can only be changed by that person; managers can only read it.
+
+const accountBody = z.object({
+  name: z.string().trim().min(2, 'Enter the full name.').max(100),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
+  role: roleNameSchema.transform(canonicalRole),
+});
+
+const record = (req: { user?: { id: string } }, targetId: string, action: string) =>
+  prisma.auditLog.create({ data: { actorId: req.user!.id, targetId, action } });
+
+// Name, email and role: set by an admin, not editable by the employee.
+employeesRouter.patch('/:id', async (req, res) => {
+  const parsed = accountBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the details and try again.' });
+  }
+  const { name, email, role } = parsed.data;
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) return res.status(404).json({ error: 'Employee not found.' });
+
+  if (email !== user.email) {
+    const taken = await prisma.user.findUnique({ where: { email } });
+    if (taken) return res.status(409).json({ error: 'An account with this email already exists.' });
+  }
+  // Moving the last admin to a role without admin rights would leave nobody in charge.
+  if (isManagerRole(user.role) && !isManagerRole(role)) {
+    const managers = await prisma.user.count({
+      where: { OR: MANAGER_ROLE_NAMES.map((r) => ({ role: { equals: r, mode: 'insensitive' as const } })) },
+    });
+    if (managers <= 1) return res.status(400).json({ error: 'At least one admin must remain.' });
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const saved = await tx.role.upsert({ where: { nameKey: roleKey(role) }, update: {}, create: { name: role, nameKey: roleKey(role) } });
+    return tx.user.update({ where: { id: user.id }, data: { name, email, role: saved.name } });
+  });
+  await record(req, user.id, 'edit_account');
+  return res.json({ employee: toDto(updated) });
+});
