@@ -10,6 +10,7 @@
 .shell-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; font-size: .9rem; font-weight: 500; color: rgb(var(--c-ink) / .82); transition: background-color .15s ease, color .15s ease; }
 .shell-item:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink)); }
 .shell-item.active { background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-weight: 600; }
+.shell-label-gap { margin-top: 14px; }
 .shell-group { width: 100%; text-align: left; cursor: pointer; }
 .shell-group.has-active { color: rgb(var(--c-ink)); font-weight: 600; }
 .shell-gcaret { margin-left: auto; display: grid; place-items: center; color: rgb(var(--c-muted)); transition: transform .2s ease; }

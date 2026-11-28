@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Avatar from '../Avatar.jsx';
 import NotificationBell from '../NotificationBell.jsx';
 import { homeFor, isManager, useSession } from '../../lib/session.jsx';
@@ -26,11 +26,19 @@ function PeopleIcon() {
     </svg>
   );
 }
-function GlobeIcon() {
+function BriefcaseIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" />
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" />
+    </svg>
+  );
+}
+function MailIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
     </svg>
   );
 }
@@ -100,7 +108,6 @@ const CRUMBS = [
 export default function AdminLayout({ children }) {
   const { user, signOut } = useSession();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -108,8 +115,6 @@ export default function AdminLayout({ children }) {
   const careersActive = pathname.startsWith('/admin/careers');
   const contactActive = pathname.startsWith('/admin/contact');
   const websiteActive = careersActive || contactActive;
-  const [siteOpen, setSiteOpen] = useState(websiteActive);
-  useEffect(() => { if (websiteActive) setSiteOpen(true); }, [websiteActive]);
 
   const manager = isManager(user);
   const nav = [
@@ -165,18 +170,15 @@ export default function AdminLayout({ children }) {
           ))}
           {manager && (
             <>
-              <button type="button" className={`shell-item shell-group${websiteActive ? ' has-active' : ''}`} aria-expanded={siteOpen} title="Website"
-                onClick={() => { if (collapsed) navigate('/admin/careers'); else setSiteOpen((v) => !v); }}>
-                <span className="shell-ico"><GlobeIcon /></span>
-                <span>Website</span>
-                <span className={`shell-gcaret${siteOpen ? ' open' : ''}`}><ChevronIcon /></span>
-              </button>
-              {siteOpen && (
-                <div className="shell-sub">
-                  <Link to="/admin/careers" className={`shell-subitem${careersActive ? ' active' : ''}`} aria-current={careersActive ? 'page' : undefined}>Careers</Link>
-                  <Link to="/admin/contact" className={`shell-subitem${contactActive ? ' active' : ''}`} aria-current={contactActive ? 'page' : undefined}>Contact</Link>
-                </div>
-              )}
+              <div className="shell-label shell-label-gap">Website</div>
+              <Link to="/admin/careers" className={`shell-item${careersActive ? ' active' : ''}`} aria-current={careersActive ? 'page' : undefined} title="Careers">
+                <span className="shell-ico"><BriefcaseIcon /></span>
+                <span>Careers</span>
+              </Link>
+              <Link to="/admin/contact" className={`shell-item${contactActive ? ' active' : ''}`} aria-current={contactActive ? 'page' : undefined} title="Contact">
+                <span className="shell-ico"><MailIcon /></span>
+                <span>Contact</span>
+              </Link>
             </>
           )}
         </nav>
