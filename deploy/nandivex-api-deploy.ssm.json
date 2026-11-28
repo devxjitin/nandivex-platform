@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Deploys a commit of nandivex-platform/api to /opt/nandivex with backup and automatic rollback.",
+  "parameters": {
+    "sha": {
+      "type": "String",
+      "description": "Full 40-character commit SHA from main",
+      "allowedPattern": "^[0-9a-f]{40}$"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "deploy",
+      "inputs": {
+        "timeoutSeconds": "900",
+        "runCommand": [
+          "set -u",
+          "cd /opt/nandivex",
+          "echo \"== deploying commit {{ sha }}\"",
+          "git -C src fetch origin main 2>&1 | tail -2",
+          "if ! git -C src cat-file -e {{ sha }}^{commit} 2>/dev/null; then echo \"Commit {{ sha }} not found on origin/main\"; exit 1; fi",
+          "if git -C src merge-base --is-ancestor {{ sha }} HEAD; then echo \"Already deployed (server is at or past this commit):\"; git -C src log --oneline -1; exit 0; fi",
+          "echo \"== backup current image\"",
+          "docker tag nandivex-api:local nandivex-api:prev && echo tagged",
+          "echo \"== update code\"",
+          "git -C src merge --ff-only {{ sha }} 2>&1 | tail -3",
+          "git -C src log --oneline -1",
+          "echo \"== build\"",
+          "if ! docker build -f /opt/nandivex/Dockerfile.api -t nandivex-api:local /opt/nandivex/src/api > /tmp/nandivex-build.log 2>&1; then",
+          "  echo \"BUILD FAILED\"; tail -25 /tmp/nandivex-build.log",
+          "  docker tag nandivex-api:prev nandivex-api:local",
+          "  exit 1",
+          "fi",
+          "tail -2 /tmp/nandivex-build.log",
+          "echo \"== restart\"",
+          "docker compose up -d 2>&1 | tail -4",
+          "echo \"== health\"",
+          "ok=0",
+          "for i in $(seq 1 20); do",
+          "  c=$(curl -s -o /dev/null -m 3 -w '%{http_code}' http://127.0.0.1:4010/health)",
+          "  if [ \"$c\" = \"200\" ]; then ok=1; break; fi",
+          "  sleep 3",
+          "done",
+          "echo \"health ok=$ok\"",
+          "if [ \"$ok\" != \"1\" ]; then",
+          "  echo \"ROLLING BACK to the previous image\"",
+          "  docker tag nandivex-api:prev nandivex-api:local",
+          "  docker compose up -d 2>&1 | tail -3",
+          "  docker logs nandivex-api-1 --tail 20 2>&1 | sed -E 's/(SECRET|PASSWORD|KEY)[A-Za-z_]*=.*/\\1=<hidden>/'",
+          "  exit 1",
+          "fi",
+          "docker image prune -f > /dev/null 2>&1",
+          "echo \"== done\"",
+          "docker ps | grep -i nandivex",
+          ""
+        ]
+      }
+    }
+  ]
+}
