@@ -35,6 +35,8 @@ export function publicDto(settings: CareerSettings | null, roles: CareerRole[]) 
         overview: r.overview ?? '',
         responsibilities: r.responsibilities,
         requirements: r.requirements,
+        // Google for Jobs needs the date a job was posted.
+        postedAt: r.createdAt.toISOString(),
       })),
     upcoming: roles
       .filter((r) => r.status === 'UPCOMING')
