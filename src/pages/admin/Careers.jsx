@@ -4,7 +4,7 @@ import AdminLayout from '../../components/admin/AdminLayout.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import CareerInterests from './CareerInterests.jsx';
 import { getCareers, reorderCareerRoles } from '../../lib/careersApi.js';
-import { STATUS_LABEL } from '../../lib/careerRules.js';
+import { KIND_LABEL, STATUS_LABEL } from '../../lib/careerRules.js';
 
 const SITE_CAREERS_URL = 'https://nandivex.com/careers';
 
@@ -32,10 +32,15 @@ export default function Careers() {
 
   useEffect(() => { getCareers().then(setData).catch((err) => setLoadError(err.message)); }, []);
 
+  const [kind, setKind] = useState('Career');
   const roles = data?.roles || [];
-  const counts = { all: roles.length, open: 0, upcoming: 0, hidden: 0 };
-  for (const r of roles) counts[r.status] += 1;
-  const shown = filter === 'all' ? roles : roles.filter((r) => r.status === filter);
+  const kindRoles = roles.filter((r) => r.kind === kind);
+  const kindCounts = { Career: 0, Internship: 0 };
+  for (const r of roles) kindCounts[r.kind] += 1;
+  const counts = { all: kindRoles.length, open: 0, upcoming: 0, hidden: 0 };
+  for (const r of kindRoles) counts[r.status] += 1;
+  const shown = filter === 'all' ? kindRoles : kindRoles.filter((r) => r.status === filter);
+  const kindName = kind === 'Internship' ? 'internship' : 'job';
 
   const setRoles = (next) => setData((d) => ({ ...d, roles: next }));
 
@@ -94,22 +99,31 @@ export default function Careers() {
 
         {data && (
           <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+            <div className="flex gap-6 border-b border-line px-6 pt-3 sm:px-8" role="tablist" aria-label="Jobs or internships">
+              {[['Career', 'Jobs'], ['Internship', 'Internships']].map(([key, label]) => (
+                <button key={key} type="button" role="tab" aria-selected={kind === key} onClick={() => { setKind(key); setFilter('all'); }}
+                  className={`-mb-px border-b-2 px-1 pb-3 text-[15px] font-bold transition ${kind === key ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-accent'}`}>
+                  {label}
+                  <span className={`ml-2 inline-flex min-w-[24px] items-center justify-center rounded-full px-2 py-0.5 text-[13px] font-bold tabular-nums ${kind === key ? 'bg-accent text-white' : 'bg-soft text-ink'}`}>{kindCounts[key]}</span>
+                </button>
+              ))}
+            </div>
             <div className="flex flex-col gap-3 border-b border-line px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter roles">
+              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by status">
                 {tabs.map(([key, label]) => (
                   <button key={key} type="button" role="tab" aria-selected={filter === key} onClick={() => setFilter(key)}
                     className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${filter === key ? 'bg-accent text-white' : 'text-muted hover:bg-tint hover:text-accent'}`}>
-                    {label} <span className={filter === key ? 'text-white/80' : 'text-muted/70'}>{counts[key]}</span>
+                    {label} <span className={`ml-1 inline-flex min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12px] font-bold tabular-nums ${filter === key ? 'bg-white/25 text-white' : 'bg-soft text-ink'}`}>{counts[key]}</span>
                   </button>
                 ))}
               </div>
-              <Link to="/admin/careers/new" className="btn-solid !py-2.5 text-[13px]"><PlusIcon /> Add role</Link>
+              <Link to={`/admin/careers/new?kind=${kind}`}className="btn-solid !py-2.5 text-[13px]"><PlusIcon /> Add {kindName}</Link>
             </div>
 
             {shown.length === 0 ? (
               <div className="p-10 text-center">
-                <p className="font-display text-lg font-bold">{roles.length === 0 ? 'No roles yet' : 'No roles here'}</p>
-                <p className="mt-1 text-sm text-muted">{roles.length === 0 ? 'Add the first role to show it on the website.' : 'Pick another tab, or add a role.'}</p>
+                <p className="font-display text-lg font-bold">{kindRoles.length === 0 ? `No ${kindName}s yet` : `No ${kindName}s here`}</p>
+                <p className="mt-1 text-sm text-muted">{kindRoles.length === 0 ? `Add the first ${kindName} to show it on the website.` : `Pick another tab, or add a ${kindName}.`}</p>
               </div>
             ) : (
               <ul className="divide-y divide-line">
@@ -132,7 +146,7 @@ export default function Careers() {
                       <span className="block truncate font-semibold hover:text-accent">{r.title}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                         <span className={`rounded-full px-2.5 py-0.5 font-semibold ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
-                        <span className="rounded-full bg-soft px-2.5 py-0.5 font-semibold text-muted">{r.kind}</span>
+                        <span className="rounded-full bg-soft px-2.5 py-0.5 font-semibold text-muted">{KIND_LABEL[r.kind]}</span>
                         {r.skills.length > 0 && <span className="hidden truncate text-muted sm:inline">{r.skills.slice(0, 4).join(', ')}{r.skills.length > 4 ? '…' : ''}</span>}
                       </span>
                     </Link>

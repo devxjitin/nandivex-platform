@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
 import Dialog from '../../components/admin/Dialog.jsx';
 import Select from '../../components/Select.jsx';
 import { addCareerRole, deleteCareerRole, getCareers, saveCareerRole } from '../../lib/careersApi.js';
-import { KINDS, STATUSES, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
+import { KINDS, KIND_LABEL, STATUSES, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
 
 const icon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
 const PlusIcon = () => <svg {...icon} strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>;
@@ -152,8 +152,8 @@ function RoleForm({ initial, isNew, onSave, onDelete }) {
     <form onSubmit={submit} noValidate className="rounded-2xl border border-line bg-surface shadow-card">
       <div className="space-y-5 p-6 sm:p-8">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="cr-kind" label="Kind">
-            <Select id="cr-kind" value={r.kind} onChange={set('kind')} options={KINDS.map((k) => ({ value: k, label: k }))} />
+          <Field id="cr-kind" label="Type">
+            <Select id="cr-kind" value={r.kind} onChange={set('kind')} options={KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] }))} />
           </Field>
           <Field id="cr-status" label="Status" hint={open ? 'Shown as hiring now, with the full details below.' : r.status === 'hidden' ? 'Kept here, but not shown on the website.' : 'Shown as "Opening soon".'}>
             <Select id="cr-status" value={r.status} onChange={set('status')} options={STATUSES} />
@@ -234,8 +234,11 @@ function RoleForm({ initial, isNew, onSave, onDelete }) {
 export default function CareerRole() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isNew = !id;
-  const [initial, setInitial] = useState(isNew ? emptyRole() : null);
+  const [initial, setInitial] = useState(() => (isNew
+    ? { ...emptyRole(), kind: searchParams.get('kind') === 'Internship' ? 'Internship' : 'Career' }
+    : null));
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
