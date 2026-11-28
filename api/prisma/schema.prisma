@@ -173,3 +173,24 @@ model CareerInterest {
   @@unique([email, kind, area])
   @@index([createdAt])
 }
+
+enum ContactStatus {
+  NEW
+  DONE
+}
+
+// A message sent through the contact form on nandivex.com.
+model ContactMessage {
+  id        String        @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  topic     String?
+  budget    String?
+  message   String
+  status    ContactStatus @default(NEW)
+  createdAt DateTime      @default(now())
+
+  @@index([status, createdAt])
+}

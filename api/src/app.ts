@@ -6,6 +6,7 @@ import { config } from './config';
 import { prisma } from './db';
 import { authRouter } from './routes/auth';
 import { careersRouter, publicCareersRouter } from './routes/careers';
+import { contactRouter, publicContactRouter } from './routes/contact';
 import { employeesRouter } from './routes/employees';
 import { notificationsRouter } from './routes/notifications';
 import { profileRouter } from './routes/profile';
@@ -18,6 +19,7 @@ export function createApp() {
   app.use(helmet());
   // Public, read-only data for the marketing website (nandivex.com), open to any origin and without cookies.
   app.use('/public/careers', cors({ origin: '*', methods: ['GET', 'POST'] }), publicCareersRouter);
+  app.use('/public/contact', cors({ origin: '*', methods: ['POST'] }), publicContactRouter);
   app.use(cors({ origin: config.WEB_URL.replace(/\/$/, ''), credentials: true }));
   app.use(express.json({ limit: '50kb' }));
   app.use(cookieParser());
@@ -37,6 +39,7 @@ export function createApp() {
   app.use('/notifications', notificationsRouter);
   app.use('/roles', rolesRouter);
   app.use('/careers', careersRouter);
+  app.use('/contact-messages', contactRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found.' }));
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

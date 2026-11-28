@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
 import Dialog from '../../components/admin/Dialog.jsx';
-import Select from '../../components/Select.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import CareerInterests from './CareerInterests.jsx';
-import { addCareerRole, deleteCareerRole, getCareers, reorderCareerRoles, saveCareerRole } from '../../lib/careersApi.js';
-import { KINDS, STATUSES, STATUS_LABEL, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
+import { deleteCareerRole, getCareers, reorderCareerRoles } from '../../lib/careersApi.js';
+import { STATUS_LABEL } from '../../lib/careerRules.js';
 
 const SITE_CAREERS_URL = 'https://nandivex.com/careers';
 
@@ -23,193 +23,15 @@ const STATUS_STYLE = {
   hidden: 'bg-soft text-muted',
 };
 
-function Field({ id, label, hint, error, children, className = '' }) {
-  return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold">{label}</label>
-      {children}
-      {error ? <p className="mt-1.5 text-[13px] text-red-500">{error}</p> : hint ? <p className="mt-1.5 text-[13px] text-muted">{hint}</p> : null}
-    </div>
-  );
-}
-
-const cls = (error) => `field ${error ? 'field-error' : ''}`;
-
-/** Type a skill and press Enter or comma to add it; click a chip's cross to remove it. */
-function ChipInput({ id, value, onChange, max = 12, invalid }) {
-  const [draft, setDraft] = useState('');
-  const has = (list, t) => list.some((v) => v.toLowerCase() === t.toLowerCase());
-  function add() {
-    const t = draft.trim();
-    if (t && !has(value, t) && value.length < max) onChange([...value, t]);
-    setDraft('');
-  }
-  // Typing or pasting "Python, React, Node" turns every part before the last comma into a chip.
-  function commit(raw) {
-    const parts = raw.split(',');
-    const rest = parts.pop();
-    const next = [...value];
-    for (const part of parts) {
-      const t = part.trim();
-      if (t && next.length < max && !has(next, t)) next.push(t);
-    }
-    if (next.length !== value.length) onChange(next);
-    setDraft(rest.trimStart());
-  }
-  return (
-    <div className={`flex flex-wrap items-center gap-2 rounded-xl border bg-surface px-3 py-2.5 transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15 ${invalid ? 'border-red-500/70' : 'border-line'}`}>
-      {value.map((s) => (
-        <span key={s} className="inline-flex items-center gap-1.5 rounded-full bg-tint py-1 pl-3 pr-1.5 text-[13px] font-semibold text-accent-dark">
-          {s}
-          <button type="button" onClick={() => onChange(value.filter((v) => v !== s))} aria-label={`Remove ${s}`} className="grid h-5 w-5 place-items-center rounded-full hover:bg-accent/15">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </span>
-      ))}
-      <input
-        id={id} value={draft} maxLength={40} placeholder={value.length ? 'Add another' : 'Type a skill, press Enter'}
-        onChange={(e) => (e.target.value.includes(',') ? commit(e.target.value) : setDraft(e.target.value))}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); add(); }
-          else if (e.key === 'Backspace' && !draft && value.length) onChange(value.slice(0, -1));
-        }}
-        onBlur={add}
-        className="min-w-[10rem] flex-1 bg-transparent py-1 text-[15px] outline-none placeholder:text-muted/70"
-      />
-    </div>
-  );
-}
-
-/** A list of short lines (responsibilities, requirements): one input each, with Add and Remove. */
-function ListEditor({ id, value, onChange, placeholder, invalid, max = 15 }) {
-  const set = (i, v) => onChange(value.map((x, j) => (j === i ? v : x)));
-  return (
-    <div className="space-y-2">
-      {value.map((line, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <input id={i === 0 ? id : undefined} value={line} onChange={(e) => set(i, e.target.value)} maxLength={300} placeholder={placeholder} aria-label={`${placeholder} ${i + 1}`} className={cls(invalid && !line.trim())} />
-          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label={`Remove item ${i + 1}`} className="grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-red-500/10 hover:text-red-600"><TrashIcon /></button>
-        </div>
-      ))}
-      {value.length < max && (
-        <button type="button" onClick={() => onChange([...value, ''])} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent hover:text-accent-dark">
-          <PlusIcon /> Add {value.length ? 'another' : 'one'}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function RoleEditor({ initial, onSave, onClose }) {
-  const [r, setR] = useState(() => ({ ...emptyRole(), ...initial }));
-  const [errors, setErrors] = useState({});
-  const [attempted, setAttempted] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState('');
-  const start = useMemo(() => JSON.stringify({ ...emptyRole(), ...initial }), [initial]);
-  const dirty = JSON.stringify(r) !== start;
-  const set = (k) => (v) => setR((x) => ({ ...x, [k]: v }));
-  const text = (k) => (e) => set(k)(e.target.value);
-
-  // After the first Save click, mistakes are re-checked as they are fixed.
-  useEffect(() => { if (attempted) setErrors(validateRole(r)); }, [attempted, r]);
-
-  const close = useCallback(() => {
-    if (!busy && (!dirty || window.confirm('Discard your changes to this role?'))) onClose();
-  }, [busy, dirty, onClose]);
-
-  async function submit(e) {
-    e.preventDefault();
-    const found = validateRole(r);
-    setErrors(found);
-    setAttempted(true);
-    if (Object.keys(found).length) {
-      setTimeout(() => document.querySelector('[role="dialog"] [aria-invalid="true"], [role="dialog"] .border-red-500\\/70')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0);
-      return;
-    }
-    setBusy(true);
-    setFormError('');
-    try {
-      await onSave(cleanRole(r));
-    } catch (err) {
-      setFormError(err.message);
-      setBusy(false);
-    }
-  }
-
-  const open = r.status === 'open';
-  return (
-    <Dialog title={initial?.id ? 'Edit role' : 'Add a role'} description="Changes show on the website as soon as you save." onClose={close} wide="xl">
-      <form onSubmit={submit} noValidate className="space-y-5">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="cr-kind" label="Kind">
-            <Select id="cr-kind" value={r.kind} onChange={set('kind')} options={KINDS.map((k) => ({ value: k, label: k }))} />
-          </Field>
-          <Field id="cr-status" label="Status" hint={open ? 'Shown as hiring now, with the full details below.' : r.status === 'hidden' ? 'Kept here, but not shown on the website.' : 'Shown as "Opening soon".'}>
-            <Select id="cr-status" value={r.status} onChange={set('status')} options={STATUSES} />
-          </Field>
-        </div>
-
-        <Field id="cr-title" label="Title" error={errors.title}>
-          <input id="cr-title" value={r.title} onChange={text('title')} maxLength={80} autoComplete="off" aria-invalid={!!errors.title} placeholder="e.g. Android Developer" className={cls(errors.title)} />
-        </Field>
-
-        <Field id="cr-blurb" label="Short description" error={errors.blurb} hint={`${r.blurb.trim().length}/300. Shown on the role card.`}>
-          <textarea id="cr-blurb" value={r.blurb} onChange={text('blurb')} maxLength={300} rows={3} aria-invalid={!!errors.blurb} className={`${cls(errors.blurb)} resize-y`} />
-        </Field>
-
-        <Field id="cr-skills" label="Skills" error={errors.skills} hint="Press Enter or comma after each one. Up to 12.">
-          <ChipInput id="cr-skills" value={r.skills} onChange={set('skills')} invalid={!!errors.skills} />
-        </Field>
-
-        {open && (
-          <fieldset className="space-y-5 rounded-2xl border border-line bg-soft/40 p-5">
-            <legend className="px-2 text-sm font-bold">Details for the open role</legend>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field id="cr-dept" label="Department" error={errors.department}>
-                <input id="cr-dept" value={r.department} onChange={text('department')} maxLength={60} aria-invalid={!!errors.department} placeholder="e.g. Engineering" className={cls(errors.department)} />
-              </Field>
-              <Field id="cr-loc" label="Location" error={errors.location}>
-                <input id="cr-loc" value={r.location} onChange={text('location')} maxLength={60} aria-invalid={!!errors.location} placeholder="e.g. Remote, India" className={cls(errors.location)} />
-              </Field>
-              <Field id="cr-type" label="Type" error={errors.type}>
-                <input id="cr-type" value={r.type} onChange={text('type')} maxLength={40} aria-invalid={!!errors.type} placeholder="e.g. Full-time" className={cls(errors.type)} />
-              </Field>
-              <Field id="cr-exp" label="Experience" error={errors.experience}>
-                <input id="cr-exp" value={r.experience} onChange={text('experience')} maxLength={40} aria-invalid={!!errors.experience} placeholder="e.g. 1 to 3 years" className={cls(errors.experience)} />
-              </Field>
-            </div>
-            <Field id="cr-overview" label="Overview" error={errors.overview} hint={`${r.overview.trim().length}/2000`}>
-              <textarea id="cr-overview" value={r.overview} onChange={text('overview')} maxLength={2000} rows={4} aria-invalid={!!errors.overview} className={`${cls(errors.overview)} resize-y`} />
-            </Field>
-            <Field id="cr-resp" label="You will (responsibilities)" error={errors.responsibilities}>
-              <ListEditor id="cr-resp" value={r.responsibilities} onChange={set('responsibilities')} placeholder="Responsibility" invalid={!!errors.responsibilities} />
-            </Field>
-            <Field id="cr-req" label="You bring (requirements)" error={errors.requirements}>
-              <ListEditor id="cr-req" value={r.requirements} onChange={set('requirements')} placeholder="Requirement" invalid={!!errors.requirements} />
-            </Field>
-          </fieldset>
-        )}
-
-        {formError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{formError}</p>}
-
-        <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-          <button type="button" onClick={close} className="btn-line">Cancel</button>
-          <button type="submit" disabled={busy || (!dirty && !!initial?.id)} className="btn-solid">{busy ? 'Saving…' : initial?.id ? 'Save role' : 'Add role'}</button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
 const iconBtn = 'grid h-9 w-9 flex-none place-items-center rounded-full text-muted transition enabled:hover:bg-tint enabled:hover:text-accent disabled:opacity-30';
 
 export default function Careers() {
   const toast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [editing, setEditing] = useState(null); // null, {} for a new role, or a role
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -222,17 +44,14 @@ export default function Careers() {
 
   const setRoles = (next) => setData((d) => ({ ...d, roles: next }));
 
-  async function onSaveRole(values) {
-    if (editing?.id) {
-      const saved = await saveCareerRole(editing.id, values);
-      setRoles(roles.map((r) => (r.id === saved.id ? saved : r)));
-    } else {
-      const saved = await addCareerRole(values);
-      setRoles([...roles, saved]);
-    }
-    toast.success('Role saved');
-    setEditing(null);
-  }
+  // A message passed in through navigation (after saving a role) is shown once as a toast.
+  const shownFor = useRef(null);
+  useEffect(() => {
+    if (!location.state?.toast || shownFor.current === location.key) return;
+    shownFor.current = location.key;
+    toast.success(location.state.toast);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location, navigate, toast]);
 
   // Moves a role past its neighbour in the list being shown; the order is saved at once.
   async function move(role, dir) {
@@ -270,7 +89,6 @@ export default function Careers() {
     }
   }
 
-  const closeEditor = useCallback(() => setEditing(null), []);
   const closeDelete = useCallback(() => setDeleting(null), []);
   const tabs = [['all', 'All'], ['open', 'Open'], ['upcoming', 'Coming soon'], ['hidden', 'Hidden']];
 
@@ -298,7 +116,7 @@ export default function Careers() {
                   </button>
                 ))}
               </div>
-              <button type="button" onClick={() => setEditing({})} className="btn-solid !py-2.5 text-[13px]"><PlusIcon /> Add role</button>
+              <Link to="/admin/careers/new" className="btn-solid !py-2.5 text-[13px]"><PlusIcon /> Add role</Link>
             </div>
 
             {shown.length === 0 ? (
@@ -314,15 +132,15 @@ export default function Careers() {
                       <button type="button" onClick={() => move(r, -1)} disabled={i === 0 || busy} aria-label={`Move ${r.title} up`} className={`${iconBtn} !h-7 !w-9`}><UpIcon /></button>
                       <button type="button" onClick={() => move(r, 1)} disabled={i === shown.length - 1 || busy} aria-label={`Move ${r.title} down`} className={`${iconBtn} !h-7 !w-9`}><DownIcon /></button>
                     </div>
-                    <button type="button" onClick={() => setEditing(r)} className="min-w-0 flex-1 text-left">
+                    <Link to={`/admin/careers/${r.id}`} className="min-w-0 flex-1 text-left">
                       <span className="block truncate font-semibold hover:text-accent">{r.title}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                         <span className={`rounded-full px-2.5 py-0.5 font-semibold ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
                         <span className="rounded-full bg-soft px-2.5 py-0.5 font-semibold text-muted">{r.kind}</span>
                         {r.skills.length > 0 && <span className="hidden truncate text-muted sm:inline">{r.skills.slice(0, 4).join(', ')}{r.skills.length > 4 ? '…' : ''}</span>}
                       </span>
-                    </button>
-                    <button type="button" onClick={() => setEditing(r)} aria-label={`Edit ${r.title}`} className={iconBtn}><EditIcon /></button>
+                    </Link>
+                    <Link to={`/admin/careers/${r.id}`} aria-label={`Edit ${r.title}`} className={iconBtn}><EditIcon /></Link>
                     <button type="button" onClick={() => setDeleting(r)} aria-label={`Delete ${r.title}`} className={`${iconBtn} enabled:hover:!bg-red-500/10 enabled:hover:!text-red-600`}><TrashIcon /></button>
                   </li>
                 ))}
@@ -335,8 +153,6 @@ export default function Careers() {
 
         {!data && !loadError && <p className="p-8 text-center text-sm text-muted">Loading…</p>}
       </div>
-
-      {editing && <RoleEditor initial={editing.id ? editing : null} onSave={onSaveRole} onClose={closeEditor} />}
 
       {deleting && (
         <Dialog title="Delete this role?" description={`"${deleting.title}" will disappear from the website at once. This cannot be undone. If you may want it again, hide it instead.`} onClose={closeDelete}>
