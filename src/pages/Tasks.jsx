@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { ApprovalMeter, TaskRows, taskStats, useNavToast } from '../components/tasks/PersonTasks.jsx';
+import { ApprovalMeter, StatsTiles, TaskRows, taskStats, useNavToast } from '../components/tasks/PersonTasks.jsx';
 import { isAdminRole } from '../data/roles.js';
 import { listEmployees } from '../lib/employeesApi.js';
 import { isManager, useSession } from '../lib/session.jsx';
@@ -130,6 +130,12 @@ function MyTasks() {
 
       {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{error}</p>}
       {!tasks && !error && <p className="p-8 text-center text-sm text-muted">Loading…</p>}
+
+      {tasks && (
+        <section className="rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+          <StatsTiles stats={taskStats(all)} />
+        </section>
+      )}
 
       {tasks && (
         <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
