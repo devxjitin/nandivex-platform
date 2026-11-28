@@ -17,7 +17,7 @@ export function createApp() {
   app.set('trust proxy', 1);
   app.use(helmet());
   // Public, read-only data for the marketing website (nandivex.com), open to any origin and without cookies.
-  app.use('/public/careers', cors({ origin: '*', methods: ['GET'] }), publicCareersRouter);
+  app.use('/public/careers', cors({ origin: '*', methods: ['GET', 'POST'] }), publicCareersRouter);
   app.use(cors({ origin: config.WEB_URL.replace(/\/$/, ''), credentials: true }));
   app.use(express.json({ limit: '50kb' }));
   app.use(cookieParser());

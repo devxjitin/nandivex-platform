@@ -30,3 +30,13 @@ export async function reorderCareerRoles(ids) {
   const { roles } = await api('/careers/roles/order', { method: 'PUT', body: { ids } });
   return roles;
 }
+
+/** People who used "Join the list" on the website, newest first. */
+export async function getCareerInterests() {
+  const { interests } = await api('/careers/interests');
+  return interests;
+}
+
+export function deleteCareerInterest(id) {
+  return api(`/careers/interests/${id}`, { method: 'DELETE' });
+}
