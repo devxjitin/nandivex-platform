@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 import Avatar from '../components/Avatar.jsx';
+import { StatsTiles, taskStats } from '../components/tasks/PersonTasks.jsx';
 import { isLeadership } from '../data/roles.js';
 import { listEmployees } from '../lib/employeesApi.js';
 import { isManager, useSession } from '../lib/session.jsx';
+import { listTasks } from '../lib/tasksApi.js';
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
@@ -27,11 +29,18 @@ export default function Home() {
   const { user } = useSession();
   const manager = isManager(user);
   const [people, setPeople] = useState(null);
+  const [myTasks, setMyTasks] = useState(null);
 
   useEffect(() => {
     if (!manager) return;
     listEmployees().then(setPeople).catch(() => setPeople([]));
   }, [manager]);
+
+  // Everyone else sees how their own tasks stand.
+  useEffect(() => {
+    if (manager || !user) return;
+    listTasks().then(setMyTasks).catch(() => setMyTasks([]));
+  }, [manager, user]);
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -46,6 +55,16 @@ export default function Home() {
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
         </section>
+
+        {!manager && myTasks && (
+          <section className="rounded-2xl border border-line bg-surface shadow-card">
+            <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-4 sm:px-8">
+              <h2 className="text-base">My tasks</h2>
+              <Link to="/tasks" className="text-[13px] font-semibold text-accent transition hover:text-accent-dark">Open my tasks</Link>
+            </div>
+            <div className="p-6 sm:p-8"><StatsTiles stats={taskStats(myTasks)} /></div>
+          </section>
+        )}
 
         {manager && (
           <>
