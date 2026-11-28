@@ -10,7 +10,7 @@ export function createEmployee({ name, email, role, password }) {
   return api('/employees', { method: 'POST', body: { name, email, role, password } });
 }
 
-/** Sets a new temporary password and emails it. Returns { emailSent }. */
+/** Sets a new temporary password and emails it. Returns { emailSent, password }: the password is shown once to the admin. */
 export function resetPassword(id) {
   return api(`/employees/${id}/reset-password`, { method: 'POST' });
 }

@@ -139,6 +139,7 @@ export default function EmployeeProfile() {
   const [error, setError] = useState('');
   const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [issued, setIssued] = useState(null); // { password, emailSent } after a reset
   const toast = useToast();
 
   useEffect(() => {
@@ -153,9 +154,7 @@ export default function EmployeeProfile() {
   async function onResend() {
     setBusy(true);
     try {
-      const { emailSent } = await resetPassword(id);
-      if (emailSent) toast.success(`A new password was emailed to ${p.email}`);
-      else toast.error('The password was changed but the email could not be sent. Try again.');
+      setIssued(await resetPassword(id));
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -235,6 +234,17 @@ export default function EmployeeProfile() {
             </div>
           </section>
         </div>
+      )}
+
+      {issued && p && (
+        <Dialog title="New password" description={issued.emailSent ? `It was also emailed to ${p.email}.` : `The email to ${p.email} could not be sent, so pass this password on yourself.`} onClose={() => setIssued(null)}>
+          <p className="select-all break-all rounded-xl bg-soft px-4 py-3 text-center font-mono text-lg font-semibold tracking-wide">{issued.password}</p>
+          <p className="mt-3 text-[13px] text-muted">This is shown only once. Close this window and it cannot be seen again.</p>
+          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setIssued(null)} className="btn-line">Close</button>
+            <button type="button" onClick={() => navigator.clipboard?.writeText(issued.password).then(() => toast.success('Password copied')).catch(() => toast.error('Could not copy. Select the password and copy it.'))} className="btn-solid">Copy password</button>
+          </div>
+        </Dialog>
       )}
 
       {removing && p && (

@@ -74,7 +74,8 @@ employeesRouter.post('/:id/reset-password', async (req, res) => {
     console.error('Reset email failed', err);
   }
   await notify([user.id], { type: 'password_reset', title: 'Your password was reset', body: 'An admin set a new password for you. It was sent to your email.' });
-  return res.json({ emailSent });
+  // Only managers reach this route. The password is returned once so the admin can pass it on if the email does not arrive.
+  return res.json({ emailSent, password });
 });
 
 employeesRouter.delete('/:id', async (req, res) => {
