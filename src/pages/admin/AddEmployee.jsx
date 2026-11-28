@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
-import Checkbox from '../../components/Checkbox.jsx';
 import Select from '../../components/Select.jsx';
 import { createEmployee, listRoles } from '../../lib/employeesApi.js';
 
@@ -64,7 +63,6 @@ export default function AddEmployee() {
   const [customRole, setCustomRole] = useState('');
   // Roles come from the API. If it fails the admin can still type a role through "Other".
   useEffect(() => { listRoles().then(setSavedRoles).catch(() => {}); }, []);
-  const [mustChange, setMustChange] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -99,7 +97,7 @@ export default function AddEmployee() {
     if (Object.keys(found).length) return;
     setBusy(true);
     try {
-      const { employee, emailSent } = await createEmployee({ ...values, mustChangePassword: mustChange });
+      const { employee, emailSent } = await createEmployee(values);
       navigate('/admin', {
         state: emailSent
           ? { toast: `Account created. Login details emailed to ${employee.email}.` }
@@ -175,7 +173,6 @@ export default function AddEmployee() {
             </div>
           </div>
 
-          <Checkbox checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} className="sm:col-span-2">Ask them to choose a new password at first sign-in</Checkbox>
         </div>
 
         {formError && (

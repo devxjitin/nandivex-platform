@@ -37,16 +37,14 @@ export const isManager = (user) => !!user && isManagerRole(user.role);
 
 /** Where a signed-in user belongs. */
 export function homeFor(user) {
-  if (user.mustChangePassword) return '/change-password';
   return '/home';
 }
 
 /** Route guard. `manager` also requires an admin-level role. */
-export function RequireAuth({ children, manager = false, allowMustChange = false }) {
+export function RequireAuth({ children, manager = false }) {
   const { user } = useSession();
   if (user === undefined) return null;
   if (!user) return <Navigate to="/" replace />;
-  if (user.mustChangePassword && !allowMustChange) return <Navigate to="/change-password" replace />;
   if (manager && !isManager(user)) return <Navigate to="/home" replace />;
   return children;
 }
