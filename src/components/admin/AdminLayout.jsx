@@ -50,6 +50,14 @@ function HomeIcon() {
     </svg>
   );
 }
+function TasksIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
+      <rect x="4" y="3.5" width="16" height="17" rx="3" />
+      <path d="M8.5 9.5l1.7 1.7 3.3-3.4M8.5 15.5h7" />
+    </svg>
+  );
+}
 function PanelIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
@@ -81,6 +89,9 @@ const CRUMBS = [
   { match: (p) => p.startsWith('/admin/careers'), trail: [{ label: 'Website' }, { label: 'Careers' }] },
   { match: (p) => p.startsWith('/admin/contact'), trail: [{ label: 'Website' }, { label: 'Contact' }] },
   { match: (p) => p.startsWith('/admin'), trail: [{ label: 'Employees' }] },
+  { match: (p) => p === '/tasks/new', trail: [{ label: 'Tasks', to: '/tasks' }, { label: 'Assign task' }] },
+  { match: (p) => /^\/tasks\/[^/]+/.test(p), trail: [{ label: 'Tasks', to: '/tasks' }, { label: 'Task' }] },
+  { match: (p) => p.startsWith('/tasks'), trail: [{ label: 'Tasks' }] },
   { match: (p) => p.startsWith('/profile'), trail: [{ label: 'Profile' }] },
   { match: (p) => p.startsWith('/home'), trail: [{ label: 'Home' }] },
 ];
@@ -102,6 +113,7 @@ export default function AdminLayout({ children }) {
   const manager = isManager(user);
   const nav = [
     { to: '/home', label: 'Home', icon: <HomeIcon />, active: pathname.startsWith('/home') },
+    { to: '/tasks', label: 'Tasks', icon: <TasksIcon />, active: pathname.startsWith('/tasks') },
     ...(manager ? [
       { to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') && !websiteActive },
     ] : []),
