@@ -7,6 +7,19 @@ import { ToastProvider } from './components/Toast.jsx';
 import { RequireAuth, SessionProvider } from './lib/session.jsx';
 import { APP_ENABLED } from './lib/flags.js';
 
+/* Every deploy renames the page chunks. A tab that was open before a deploy (or a cached copy of the page) then asks for a
+   file that no longer exists, and the page shows "Failed to fetch dynamically imported module". Reload once to pick up the
+   new files. The timestamp stops a reload loop if the network is simply down. */
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    const last = Number(sessionStorage.getItem('chunk-reload-at') || 0);
+    if (Date.now() - last < 15000) return;
+    sessionStorage.setItem('chunk-reload-at', String(Date.now()));
+  } catch { /* storage blocked: reload once anyway */ }
+  event.preventDefault();
+  window.location.reload();
+});
+
 /* In the deployed site APP_ENABLED is false, the bundler drops these imports, and only the sign-in page is served. */
 
 const Employees = APP_ENABLED ? lazy(() => import('./pages/admin/Employees.jsx')) : null;
