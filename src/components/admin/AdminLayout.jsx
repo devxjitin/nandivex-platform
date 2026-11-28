@@ -26,6 +26,14 @@ function PeopleIcon() {
     </svg>
   );
 }
+function BriefcaseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
+      <rect x="3" y="7" width="18" height="13" rx="2.5" />
+      <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18" />
+    </svg>
+  );
+}
 function UserIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}>
@@ -68,6 +76,7 @@ function LogoutIcon() {
 const CRUMBS = [
   { match: (p) => p.startsWith('/admin/employees/new'), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Add employee' }] },
   { match: (p) => /^\/admin\/employees\/[^/]+/.test(p), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Details' }] },
+  { match: (p) => p.startsWith('/admin/careers'), trail: [{ label: 'Careers' }] },
   { match: (p) => p.startsWith('/admin'), trail: [{ label: 'Employees' }] },
   { match: (p) => p.startsWith('/profile'), trail: [{ label: 'Profile' }] },
   { match: (p) => p.startsWith('/home'), trail: [{ label: 'Home' }] },
@@ -84,7 +93,10 @@ export default function AdminLayout({ children }) {
   const manager = isManager(user);
   const nav = [
     { to: '/home', label: 'Home', icon: <HomeIcon />, active: pathname.startsWith('/home') },
-    ...(manager ? [{ to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') }] : []),
+    ...(manager ? [
+      { to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') && !pathname.startsWith('/admin/careers') },
+      { to: '/admin/careers', label: 'Careers', icon: <BriefcaseIcon />, active: pathname.startsWith('/admin/careers') },
+    ] : []),
   ];
   const trail = (CRUMBS.find((c) => c.match(pathname)) || CRUMBS[0]).trail;
 
