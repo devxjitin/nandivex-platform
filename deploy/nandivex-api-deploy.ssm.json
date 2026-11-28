@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2.2",
-  "description": "Deploys a commit of nandivex-platform/api to /opt/nandivex with backup and automatic rollback.",
+  "description": "Deploys a commit of nandivex-platform/api to /opt/nandivex: backup, rebuild, apply database migrations, restart, health check, automatic rollback.",
   "parameters": {
     "sha": {
       "type": "String",
@@ -33,6 +33,13 @@
           "  exit 1",
           "fi",
           "tail -2 /tmp/nandivex-build.log",
+          "echo \"== database migrations\"",
+          "if ! docker compose run --rm --no-deps api npx prisma migrate deploy > /tmp/nandivex-migrate.log 2>&1; then",
+          "  echo \"MIGRATION FAILED (the running container was not touched)\"; tail -25 /tmp/nandivex-migrate.log",
+          "  docker tag nandivex-api:prev nandivex-api:local",
+          "  exit 1",
+          "fi",
+          "grep -E \"migrations? (found|have|applied)|No pending|successfully\" /tmp/nandivex-migrate.log | head -3",
           "echo \"== restart\"",
           "docker compose up -d 2>&1 | tail -4",
           "echo \"== health\"",

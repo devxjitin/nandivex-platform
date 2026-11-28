@@ -10,14 +10,17 @@ AWS app server (`parakh-production-app`, shared with Parakh) and is deployed by 
 2. The job signs in to AWS with GitHub OIDC (no stored keys) as the role `nandivex-api-github-deploy`.
 3. It asks the server, through Systems Manager, to run the document `nandivex-api-deploy` with the commit SHA.
 4. On the server the document: tags the running image as `nandivex-api:prev`, fast-forwards `/opt/nandivex/src` to
-   the commit, builds the image, restarts the container, and waits for `http://127.0.0.1:4010/health`.
-   If the build or the health check fails it puts `nandivex-api:prev` back and exits with an error, so the job
-   goes red and the old version keeps serving.
+   the commit, builds the image, applies database migrations (`prisma migrate deploy`), restarts the container, and
+   waits for `http://127.0.0.1:4010/health`. If the build, a migration or the health check fails it puts
+   `nandivex-api:prev` back and exits with an error, so the job goes red and the old version keeps serving.
 5. The job prints the server output and finally checks `https://api.nandivex.in/health`.
 
 If the server is already at or past the commit, the document says "Already deployed" and does nothing.
-Only API changes deploy the API. Database migrations are **not** run: the container does not run `prisma migrate`,
-so a change under `api/prisma/migrations` has to be applied by hand before or after the deploy.
+Only API changes deploy the API.
+
+**Migrations run on every deploy, before the restart.** Keep them backward compatible (add tables and columns, do not
+drop or rename what the previous version still uses): if the new version then fails its health check, the old image is
+put back but the database stays migrated, and the old code must still work against it.
 
 ## What exists in AWS (account 143920986615, region ap-south-1)
 
