@@ -6,5 +6,8 @@ const key = (role) => String(role || '').trim().toLowerCase();
 /** May add, reset and remove employees. */
 export const isManagerRole = (role) => ['founder', 'co-founder', 'admin'].includes(key(role));
 
+/** Admins run the platform; tasks are never given to them. */
+export const isAdminRole = (role) => key(role) === 'admin';
+
 /** Highlighted in the employee list. */
 export const isLeadership = (role) => ['founder', 'co-founder'].includes(key(role));

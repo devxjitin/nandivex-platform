@@ -6,6 +6,8 @@ import { useToast } from '../../components/Toast.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import RoleSelect, { roleNameOk } from '../../components/RoleSelect.jsx';
 import { getEmployeeProfile, removeEmployee, resetPassword, revealSecret, updateEmployee } from '../../lib/employeesApi.js';
+import { TasksCard } from '../../components/tasks/PersonTasks.jsx';
+import { listTasks } from '../../lib/tasksApi.js';
 import { useSession } from '../../lib/session.jsx';
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -137,6 +139,7 @@ export default function EmployeeProfile() {
   const { user: me } = useSession();
   const [p, setP] = useState(null);
   const [error, setError] = useState('');
+  const [tasks, setTasks] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [issued, setIssued] = useState(null); // { password, emailSent } after a reset
@@ -146,6 +149,8 @@ export default function EmployeeProfile() {
     setP(null);
     setError('');
     getEmployeeProfile(id).then(setP).catch((err) => setError(err.message));
+    setTasks(null);
+    listTasks().then((all) => setTasks(all.filter((t) => t.assignee.id === id))).catch(() => setTasks([]));
   }, [id]);
 
   const closeRemove = useCallback(() => setRemoving(false), []);
@@ -197,6 +202,8 @@ export default function EmployeeProfile() {
               </div>
             </div>
           </section>
+
+          {tasks && <TasksCard tasks={tasks} personId={id} canAssign />}
 
           <AccountCard key={`${p.fullName}|${p.email}|${p.role}`} id={id} p={p} onSaved={(u) => setP((x) => ({ ...x, fullName: u.name, email: u.email, role: u.role }))} />
 

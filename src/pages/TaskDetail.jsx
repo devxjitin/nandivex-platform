@@ -144,7 +144,7 @@ export default function TaskDetail() {
     setBusy(true);
     try {
       await deleteTask(task.id);
-      navigate('/tasks', { replace: true, state: { toast: 'Task deleted' } });
+      navigate(manager ? `/tasks/for/${task.assignee.id}` : '/tasks', { replace: true, state: { toast: 'Task deleted' } });
     } catch (err) {
       toast.error(err.message);
       setConfirmDelete(false);
@@ -168,7 +168,7 @@ export default function TaskDetail() {
             <StatusBadge status={task.status} />
           </div>
           <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            <Meta label="For">{task.assignee.name}<span className="text-muted"> · {task.assignee.role}</span></Meta>
+            <Meta label="For">{manager ? <Link to={`/tasks/for/${task.assignee.id}`} className="font-semibold text-accent hover:text-accent-dark">{task.assignee.name}</Link> : task.assignee.name}<span className="text-muted"> · {task.assignee.role}</span></Meta>
             {task.createdBy && <Meta label="Assigned by">{task.createdBy.name}</Meta>}
             <Meta label="Due">{task.dueDate ? <span className={late ? 'font-semibold text-red-600' : ''}>{fmtDate(task.dueDate)}{late ? ' (overdue)' : ''}</span> : <span className="text-muted">No due date</span>}</Meta>
             <Meta label="Assigned on">{fmtDate(task.createdAt)}</Meta>

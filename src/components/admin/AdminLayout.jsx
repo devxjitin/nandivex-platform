@@ -90,6 +90,7 @@ const CRUMBS = [
   { match: (p) => p.startsWith('/admin/contact'), trail: [{ label: 'Website' }, { label: 'Contact' }] },
   { match: (p) => p.startsWith('/admin'), trail: [{ label: 'Employees' }] },
   { match: (p) => p === '/tasks/new', trail: [{ label: 'Tasks', to: '/tasks' }, { label: 'Assign task' }] },
+  { match: (p) => p.startsWith('/tasks/for/'), trail: [{ label: 'Tasks', to: '/tasks' }, { label: 'Person' }] },
   { match: (p) => /^\/tasks\/[^/]+/.test(p), trail: [{ label: 'Tasks', to: '/tasks' }, { label: 'Task' }] },
   { match: (p) => p.startsWith('/tasks'), trail: [{ label: 'Tasks' }] },
   { match: (p) => p.startsWith('/profile'), trail: [{ label: 'Profile' }] },

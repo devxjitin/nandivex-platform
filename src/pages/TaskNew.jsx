@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 import Select from '../components/Select.jsx';
 import { ItemAdder, PendingList } from '../components/tasks/TaskParts.jsx';
+import { isAdminRole } from '../data/roles.js';
 import { listEmployees } from '../lib/employeesApi.js';
 import { fileType, today } from '../lib/taskRules.js';
 import { addFileItem, addLinkItem, addTextItem, createTask } from '../lib/tasksApi.js';
@@ -21,8 +22,9 @@ function Field({ id, label, hint, error, children }) {
 /** A manager gives a task to someone: what to do (text, links, files) and an optional due date. */
 export default function TaskNew() {
   const navigate = useNavigate();
+  const forId = useSearchParams()[0].get('for') || '';
   const [people, setPeople] = useState(null);
-  const [v, setV] = useState({ title: '', description: '', assigneeId: '', dueDate: '' });
+  const [v, setV] = useState({ title: '', description: '', assigneeId: forId, dueDate: '' });
   const [items, setItems] = useState([]);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -31,7 +33,7 @@ export default function TaskNew() {
 
   useEffect(() => { listEmployees().then(setPeople).catch(() => setPeople([])); }, []);
   const options = useMemo(
-    () => (people || []).map((p) => ({ value: p.id, label: `${p.name} · ${p.role}` })),
+    () => (people || []).filter((p) => !isAdminRole(p.role)).map((p) => ({ value: p.id, label: `${p.name} · ${p.role}` })),
     [people],
   );
 
@@ -109,7 +111,7 @@ export default function TaskNew() {
         <div className="flex flex-col-reverse gap-3 border-t border-line px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <p className="text-[13px] text-muted">They get a notification as soon as you assign it.</p>
           <div className="flex flex-col-reverse gap-3 sm:flex-row">
-            <Link to="/tasks" className="btn-line">Cancel</Link>
+            <Link to={forId ? `/tasks/for/${forId}` : '/tasks'} className="btn-line">Cancel</Link>
             <button type="submit" disabled={busy} className="btn-solid">{busy ? 'Assigning…' : 'Assign task'}</button>
           </div>
         </div>

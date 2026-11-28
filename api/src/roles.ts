@@ -9,6 +9,9 @@ export const roleKey = (role: string) => role.trim().toLowerCase();
 /** Roles that may add, reset and remove employees. */
 export const isManagerRole = (role: string) => MANAGER_KEYS.includes(roleKey(role));
 
+/** Admins run the platform; tasks are never given to them. */
+export const isAdminRole = (role: string) => roleKey(role) === 'admin';
+
 /** Built-in roles. They are always in the role list, whether or not anyone has them yet. */
 export const SYSTEM_ROLES = ['Founder', 'Co-Founder', 'Admin'];
 

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth';
 import { prisma } from '../db';
 import { notify, notifyManagers } from '../notify';
-import { isManagerRole } from '../roles';
+import { isAdminRole, isManagerRole } from '../roles';
 
 /* Tasks. Founders, Co-Founders and Admins give a task to anyone. The task is explained with items (text, links,
    files) and the assignee hands in proof the same way. A manager other than the assignee then approves it, or
@@ -136,8 +136,9 @@ tasksRouter.post('/', async (req, res) => {
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' });
   const d = parsed.data;
-  const assignee = await prisma.user.findUnique({ where: { id: d.assigneeId }, select: { id: true } });
+  const assignee = await prisma.user.findUnique({ where: { id: d.assigneeId }, select: { id: true, role: true } });
   if (!assignee) return res.status(400).json({ error: 'That person was not found.' });
+  if (isAdminRole(assignee.role)) return res.status(400).json({ error: 'Tasks cannot be given to an Admin.' });
   const task = await prisma.task.create({
     data: {
       title: d.title,

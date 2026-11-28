@@ -7,6 +7,8 @@ export const STATUS = {
   submitted: { label: 'Under review', badge: 'bg-amber-500/10 text-amber-700' },
   rejected: { label: 'Needs rework', badge: 'bg-red-500/10 text-red-600' },
   approved: { label: 'Approved', badge: 'bg-emerald-500/10 text-emerald-700' },
+  // Not stored: a task still not handed in (or sent back) after its due date. See statusOf.
+  missed: { label: 'Missed', badge: 'bg-red-500/10 text-red-600' },
 };
 
 const BY_EXTENSION = {
@@ -51,3 +53,6 @@ const todayYmd = () => { const t = new Date(); return `${t.getFullYear()}-${Stri
 /** Past its due date and still not handed in or approved. */
 export const isOverdue = (task) => !!task.dueDate && task.dueDate < todayYmd() && (task.status === 'pending' || task.status === 'rejected');
 export const today = todayYmd;
+
+/** What to show in lists and counts: the task's status, or 'missed' once it is overdue. */
+export const statusOf = (task) => (isOverdue(task) ? 'missed' : task.status);
