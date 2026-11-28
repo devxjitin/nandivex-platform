@@ -9,7 +9,7 @@ import DatePicker from '../components/DatePicker.jsx';
 import ProfileProgress, { checklist } from '../components/ProfileProgress.jsx';
 import Select from '../components/Select.jsx';
 import { COUNTRIES, INDIAN_STATES, lookupPincode } from '../lib/places.js';
-import { BLOOD_GROUPS, GENDERS, todayYmd, validateProfile } from '../lib/profileRules.js';
+import { BLOOD_GROUPS, GENDERS, normalizePhone, todayYmd, validateProfile } from '../lib/profileRules.js';
 import { getProfile, removePhoto, resizeImage, saveProfile, uploadPhoto } from '../lib/profileApi.js';
 import { useToast } from '../components/Toast.jsx';
 import { useSession } from '../lib/session.jsx';
@@ -49,7 +49,7 @@ function Field({ id, label, error, className = '', children }) {
 }
 
 /** A saved secret (PAN, account number) shows only its last four characters until the person chooses to change it. */
-function SecretField({ id, label, saved, last4, editing, onEdit, onCancel, value, onChange, placeholder, error, upper }) {
+function SecretField({ id, label, saved, last4, editing, onEdit, onCancel, value, onChange, placeholder, error, upper, onBlur }) {
   if (saved && !editing) {
     return (
       <Field id={id} label={label}>
@@ -64,7 +64,7 @@ function SecretField({ id, label, saved, last4, editing, onEdit, onCancel, value
     <Field id={id} label={label} error={error}>
       <div className="flex items-center gap-3">
         <input
-          id={id} value={value} onChange={(e) => onChange(upper ? e.target.value.toUpperCase() : e.target.value)} autoComplete="off" placeholder={placeholder}
+          id={id} value={value} onChange={(e) => onChange(upper ? e.target.value.toUpperCase() : e.target.value)} autoComplete="off" placeholder={placeholder} onBlur={onBlur}
           aria-invalid={!!error} className={`field font-mono ${error ? 'field-error' : ''}`}
         />
         {saved && <button type="button" onClick={onCancel} className="flex-none text-[13px] font-semibold text-muted hover:text-accent">Cancel</button>}
@@ -76,7 +76,7 @@ function SecretField({ id, label, saved, last4, editing, onEdit, onCancel, value
 // A saved value that is not in the list (older free-text entries) is kept as an option so it is not lost.
 const withCurrent = (list, current) => (current && !list.includes(current) ? [current, ...list] : list);
 
-function AddressFields({ prefix, value, onChange, errors }) {
+function AddressFields({ prefix, value, onChange, onTouch, errors }) {
   const [lookup, setLookup] = useState(''); // '', 'busy' or 'missing'
   const ctl = useRef(null);
   useEffect(() => () => ctl.current?.abort(), []);
@@ -123,14 +123,14 @@ function AddressFields({ prefix, value, onChange, errors }) {
     } else if (key === 'pincode') {
       control = (
         <input
-          id={id} value={value.pincode} onChange={(e) => onPincode(e.target.value)} autoComplete="postal-code" inputMode={isIndia ? 'numeric' : 'text'}
+          id={id} value={value.pincode} onChange={(e) => onPincode(e.target.value)} onBlur={() => onTouch(`${prefix}.pincode`)} autoComplete="postal-code" inputMode={isIndia ? 'numeric' : 'text'}
           maxLength={isIndia ? 6 : 10} placeholder={isIndia ? '6-digit pincode' : 'Postal code'} aria-invalid={!!err} className={`field ${err ? 'field-error' : ''}`}
         />
       );
     } else {
       control = (
         <input
-          id={id} value={value[key]} onChange={(e) => onChange(key, e.target.value)} autoComplete="off" maxLength={LIMITS[key]}
+          id={id} value={value[key]} onChange={(e) => onChange(key, e.target.value)} onBlur={() => onTouch(`${prefix}.${key}`)} autoComplete="off" maxLength={LIMITS[key]}
           aria-invalid={!!err} className={`field ${err ? 'field-error' : ''}`}
         />
       );
@@ -155,7 +155,7 @@ export default function Profile() {
   const [same, setSame] = useState(true);
   const [editPan, setEditPan] = useState(false);
   const [editAccount, setEditAccount] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({}); // fields the person has left, so their mistakes can be shown
   const [attempted, setAttempted] = useState(false); // after the first Save click, mistakes are shown as they are fixed
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -185,7 +185,7 @@ export default function Profile() {
     setSnapshot(JSON.stringify({ form: next, same: nextSame }));
     setEditPan(false);
     setEditAccount(false);
-    setErrors({});
+    setTouched({});
     setAttempted(false);
   }
 
@@ -196,15 +196,24 @@ export default function Profile() {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const setValue = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
   const setAddr = (which) => (key, value) => { setForm((f) => ({ ...f, [which]: { ...f[which], [key]: value } })); };
-  const cls = (key, extra = '') => `field ${extra} ${errors[key] ? 'field-error' : ''}`;
+  const touch = (key) => setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
 
   const check = useCallback((f) => validateProfile(f, { same, savedPan: !!meta?.pan.saved, savedAccount: !!meta?.accountSaved, editPan, editAccount }), [same, meta, editPan, editAccount]);
-  useEffect(() => { if (attempted && form) setErrors(check(form)); }, [attempted, form, check]);
+  const allErrors = useMemo(() => (form ? check(form) : {}), [form, check]);
+  // A mistake shows once the field was left or Save was pressed. An entry that can never be right, like a mobile
+  // number starting with 5 ("Invalid …"), shows as soon as it is typed. Half-filled card banners wait for Save.
+  const errors = useMemo(() => {
+    const out = {};
+    for (const [k, msg] of Object.entries(allErrors)) {
+      if (attempted || (!k.startsWith('card.') && (touched[k] || msg.startsWith('Invalid')))) out[k] = msg;
+    }
+    return out;
+  }, [allErrors, attempted, touched]);
+  const cls = (key, extra = '') => `field ${extra} ${errors[key] ? 'field-error' : ''}`;
 
   async function onSave(e) {
     e.preventDefault();
     const found = check(form);
-    setErrors(found);
     setAttempted(true);
     if (Object.keys(found).length) {
       // Take the person to the first thing that needs fixing.
@@ -219,6 +228,7 @@ export default function Profile() {
     try {
       const body = {
         ...form,
+        phone: normalizePhone(form.phone),
         permanentAddress: same ? form.currentAddress : form.permanentAddress,
         pan: editPan ? form.pan.trim() : '',
         bankAccountNumber: editAccount ? form.bankAccountNumber.trim() : '',
@@ -287,7 +297,7 @@ export default function Profile() {
     setSame(snap.same);
     setEditPan(false);
     setEditAccount(false);
-    setErrors({});
+    setTouched({});
     setAttempted(false);
   }
 
@@ -343,7 +353,7 @@ export default function Profile() {
               <Field id="pf-phone" label="Mobile number" error={errors.phone}>
                 <input
                   id="pf-phone" type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value.replace(/[^\d+\s-]/g, '') }))}
-                  autoComplete="tel" placeholder="9876543210" maxLength={14} aria-invalid={!!errors.phone} className={cls('phone')}
+                  autoComplete="tel" placeholder="9876543210" maxLength={14} onBlur={() => touch('phone')} aria-invalid={!!errors.phone} className={cls('phone')}
                 />
               </Field>
               <Field id="pf-gender" label="Gender" error={errors.gender}>
@@ -355,42 +365,42 @@ export default function Profile() {
             </Card>
 
             <Card title="Current address" error={errors['card.current']}>
-              <AddressFields prefix="current" value={form.currentAddress} onChange={setAddr('currentAddress')} errors={errors} />
+              <AddressFields prefix="current" value={form.currentAddress} onChange={setAddr('currentAddress')} onTouch={touch} errors={errors} />
             </Card>
 
             <Card title="Permanent address" error={errors['card.permanent']}>
               <Checkbox checked={same} onChange={(e) => { setSame(e.target.checked); }} className="sm:col-span-2">Same as current address</Checkbox>
-              {!same && <AddressFields prefix="permanent" value={form.permanentAddress} onChange={setAddr('permanentAddress')} errors={errors} />}
+              {!same && <AddressFields prefix="permanent" value={form.permanentAddress} onChange={setAddr('permanentAddress')} onTouch={touch} errors={errors} />}
             </Card>
 
             <Card title="PAN and bank details" error={errors['card.bank']}>
               <SecretField
                 id="pf-pan" label="PAN number" saved={meta.pan.saved} last4={meta.pan.last4} editing={editPan} placeholder="ABCDE1234F" upper
-                value={form.pan} error={errors.pan}
+                value={form.pan} error={errors.pan} onBlur={() => touch('pan')}
                 onChange={(v) => setForm((f) => ({ ...f, pan: v.replace(/[^A-Za-z0-9]/g, '').slice(0, 10) }))}
                 onEdit={() => setEditPan(true)} onCancel={() => { setEditPan(false); setForm((f) => ({ ...f, pan: '' })); }}
               />
               <div className="hidden sm:block" />
               <Field id="pf-bank-holder" label="Account holder name" error={errors.bankHolder}>
-                <input id="pf-bank-holder" value={form.bankHolder} onChange={set('bankHolder')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankHolder} className={cls('bankHolder')} />
+                <input id="pf-bank-holder" value={form.bankHolder} onChange={set('bankHolder')} autoComplete="off" maxLength={80} onBlur={() => touch('bankHolder')} aria-invalid={!!errors.bankHolder} className={cls('bankHolder')} />
               </Field>
               <Field id="pf-bank-name" label="Bank name" error={errors.bankName}>
-                <input id="pf-bank-name" value={form.bankName} onChange={set('bankName')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankName} className={cls('bankName')} />
+                <input id="pf-bank-name" value={form.bankName} onChange={set('bankName')} autoComplete="off" maxLength={80} onBlur={() => touch('bankName')} aria-invalid={!!errors.bankName} className={cls('bankName')} />
               </Field>
               <SecretField
                 id="pf-bank-account" label="Account number" saved={meta.accountSaved} last4={meta.accountLast4} editing={editAccount} placeholder="Account number"
-                value={form.bankAccountNumber} error={errors.bankAccountNumber}
+                value={form.bankAccountNumber} error={errors.bankAccountNumber} onBlur={() => touch('bankAccountNumber')}
                 onChange={(v) => setForm((f) => ({ ...f, bankAccountNumber: v.replace(/\D/g, '').slice(0, 18) }))}
                 onEdit={() => setEditAccount(true)} onCancel={() => { setEditAccount(false); setForm((f) => ({ ...f, bankAccountNumber: '' })); }}
               />
               <Field id="pf-bank-ifsc" label="IFSC code" error={errors.bankIfsc}>
                 <input
                   id="pf-bank-ifsc" value={form.bankIfsc} onChange={(e) => setForm((f) => ({ ...f, bankIfsc: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 11) }))}
-                  autoComplete="off" placeholder="HDFC0001234" maxLength={11} aria-invalid={!!errors.bankIfsc} className={cls('bankIfsc', 'font-mono')}
+                  autoComplete="off" placeholder="HDFC0001234" maxLength={11} onBlur={() => touch('bankIfsc')} aria-invalid={!!errors.bankIfsc} className={cls('bankIfsc', 'font-mono')}
                 />
               </Field>
               <Field id="pf-bank-branch" label="Branch" error={errors.bankBranch}>
-                <input id="pf-bank-branch" value={form.bankBranch} onChange={set('bankBranch')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankBranch} className={cls('bankBranch')} />
+                <input id="pf-bank-branch" value={form.bankBranch} onChange={set('bankBranch')} autoComplete="off" maxLength={80} onBlur={() => touch('bankBranch')} aria-invalid={!!errors.bankBranch} className={cls('bankBranch')} />
               </Field>
             </Card>
           </form>
