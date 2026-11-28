@@ -1,6 +1,8 @@
 /* Rules for a Careers role. The API checks the same things (api/src/routes/careers.ts), so keep them in step. */
 
 export const KINDS = ['Career', 'Internship'];
+// Stored values stay 'Career' / 'Internship' (API + website use them); the portal shows 'Job'.
+export const KIND_LABEL = { Career: 'Job', Internship: 'Internship' };
 export const STATUSES = [
   { value: 'open', label: 'Open: hiring now' },
   { value: 'upcoming', label: 'Coming soon' },
