@@ -10,6 +10,7 @@ import { APP_ENABLED } from './lib/flags.js';
 /* In the deployed site APP_ENABLED is false, the bundler drops these imports, and only the sign-in page is served. */
 
 const Employees = APP_ENABLED ? lazy(() => import('./pages/admin/Employees.jsx')) : null;
+const Careers = APP_ENABLED ? lazy(() => import('./pages/admin/Careers.jsx')) : null;
 const AddEmployee = APP_ENABLED ? lazy(() => import('./pages/admin/AddEmployee.jsx')) : null;
 const ChangePassword = APP_ENABLED ? lazy(() => import('./pages/ChangePassword.jsx')) : null;
 const ForgotPassword = APP_ENABLED ? lazy(() => import('./pages/ForgotPassword.jsx')) : null;
@@ -33,6 +34,7 @@ function App() {
               <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/admin" element={<RequireAuth manager><Employees /></RequireAuth>} />
+              <Route path="/admin/careers" element={<RequireAuth manager><Careers /></RequireAuth>} />
               <Route path="/admin/employees/new" element={<RequireAuth manager><AddEmployee /></RequireAuth>} />
               <Route path="/admin/employees/:id" element={<RequireAuth manager><EmployeeProfile /></RequireAuth>} />
             </>

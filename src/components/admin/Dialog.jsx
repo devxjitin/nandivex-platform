@@ -22,7 +22,7 @@ export default function Dialog({ title, description, onClose, children, wide = f
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-night/60 p-0 sm:items-center sm:p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        className={`page-in max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-surface p-6 shadow-lift sm:rounded-3xl sm:p-8 ${wide ? 'sm:max-w-xl' : 'sm:max-w-md'}`}>
+        className={`page-in max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-surface p-6 shadow-lift sm:rounded-3xl sm:p-8 ${wide === 'xl' ? 'sm:max-w-2xl' : wide ? 'sm:max-w-xl' : 'sm:max-w-md'}`}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id={titleId} className="text-2xl">{title}</h2>
