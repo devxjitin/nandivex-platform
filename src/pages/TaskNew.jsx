@@ -8,6 +8,7 @@ import { isAdminRole } from '../data/roles.js';
 import { listEmployees } from '../lib/employeesApi.js';
 import { fileType, today } from '../lib/taskRules.js';
 import { addFileItem, addLinkItem, addTextItem, createTask } from '../lib/tasksApi.js';
+import { useSession } from '../lib/session.jsx';
 
 function Field({ id, label, hint, error, children }) {
   return (
@@ -22,6 +23,7 @@ function Field({ id, label, hint, error, children }) {
 /** A manager gives a task to someone: what to do (text, links, files) and an optional due date. */
 export default function TaskNew() {
   const navigate = useNavigate();
+  const { user } = useSession();
   const forId = useSearchParams()[0].get('for') || '';
   const [people, setPeople] = useState(null);
   const [v, setV] = useState({ title: '', description: '', assigneeIds: forId ? [forId] : [], dueDate: '' });
@@ -127,7 +129,7 @@ export default function TaskNew() {
                     <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-tint/30">
                       <input type="checkbox" checked={picked.has(p.id)} onChange={() => toggle(p.id)} className="h-4 w-4 flex-none accent-[var(--accent,#7c3aed)]" />
                       <Avatar user={p} path={`/employees/${p.id}/photo`} className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-accent text-xs font-bold text-white" />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.name}{p.id === user?.id && <span className="ml-1.5 text-xs font-semibold text-accent">(You)</span>}</span>
                       <span className="flex-none rounded-full bg-tint px-2.5 py-0.5 text-xs font-semibold text-accent-dark">{p.role}</span>
                     </label>
                   </li>
