@@ -116,3 +116,46 @@ model Notification {
 
   @@index([userId, createdAt])
 }
+
+enum CareerKind {
+  CAREER
+  INTERNSHIP
+}
+
+// OPEN roles are listed as hiring now, UPCOMING ones as "opening soon", HIDDEN ones are kept but not shown.
+enum CareerStatus {
+  OPEN
+  UPCOMING
+  HIDDEN
+}
+
+// The Careers page on nandivex.com. There is only ever one row (id 1): the message shown while nothing is open.
+model CareerSettings {
+  id          Int      @id @default(1)
+  statusTitle String
+  statusText  String
+  updatedAt   DateTime @updatedAt
+}
+
+model CareerRole {
+  id               String       @id @default(uuid())
+  kind             CareerKind
+  status           CareerStatus @default(UPCOMING)
+  title            String
+  // The short text on the "opening soon" cards.
+  blurb            String
+  skills           String[]
+  // The rest is only needed once a role is OPEN.
+  department       String?
+  location         String?
+  type             String?
+  experience       String?
+  overview         String?
+  responsibilities String[]
+  requirements     String[]
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([status, sortOrder])
+}
