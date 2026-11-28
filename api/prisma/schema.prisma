@@ -159,3 +159,17 @@ model CareerRole {
 
   @@index([status, sortOrder])
 }
+
+// Someone who used "Join the list" on the website's Careers page.
+model CareerInterest {
+  id        String     @id @default(uuid())
+  name      String
+  email     String
+  kind      CareerKind
+  area      String
+  links     String?
+  createdAt DateTime   @default(now())
+
+  @@unique([email, kind, area])
+  @@index([createdAt])
+}

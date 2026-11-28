@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { CareerKind, CareerRole, CareerSettings, CareerStatus } from '@prisma/client';
 import { z } from 'zod';
 import { requireAuth, requireManager } from '../auth';
@@ -55,6 +56,38 @@ publicCareersRouter.get('/', async (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=300');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.json(publicDto(settings, roles));
+});
+
+// "Join the list" on the Careers page. Open to the website's visitors, so it is rate limited and has a hidden
+// field that only bots fill in.
+const interestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+const interestBody = z.object({
+  name: z.string().trim().min(2, 'Enter your name.').max(80, 'That name is too long.'),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(120),
+  kind: z.enum(['Career', 'Internship']),
+  area: z.string().trim().min(1, 'Choose an area.').max(80),
+  links: z.string().trim().max(300, 'Keep the link under 300 characters.').optional().default(''),
+  website: z.string().optional(), // honeypot
+});
+
+publicCareersRouter.post('/interest', interestLimiter, express.json({ limit: '10kb' }), async (req, res) => {
+  const parsed = interestBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' });
+  const { website, links, ...d } = parsed.data;
+  if (website) return res.json({ ok: true }); // a bot: pretend it worked
+  const data = { ...d, kind: KIND_IN[d.kind], links: links || null };
+  await prisma.careerInterest.upsert({
+    where: { email_kind_area: { email: data.email, kind: data.kind, area: data.area } },
+    update: { name: data.name, links: data.links },
+    create: data,
+  });
+  res.status(201).json({ ok: true });
 });
 
 // --- Managers: edit ---------------------------------------------------------------------------
@@ -196,4 +229,19 @@ careersRouter.delete('/roles/:id', async (req, res) => {
   await prisma.careerRole.delete({ where: { id: existing.id } });
   await audit(req.user!.id, existing.id, 'careers_delete_role');
   return res.status(204).end();
+});
+
+careersRouter.get('/interests', async (_req, res) => {
+  const rows = await prisma.careerInterest.findMany({ orderBy: { createdAt: 'desc' }, take: 1000 });
+  res.json({
+    interests: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, kind: KIND_OUT[r.kind], area: r.area, links: r.links ?? '', createdAt: r.createdAt.toISOString() })),
+  });
+});
+
+careersRouter.delete('/interests/:id', async (req, res) => {
+  const existing = await prisma.careerInterest.findUnique({ where: { id: String(req.params.id) } });
+  if (!existing) return res.status(404).json({ error: 'Not found.' });
+  await prisma.careerInterest.delete({ where: { id: existing.id } });
+  await audit(req.user!.id, existing.id, 'careers_delete_interest');
+  res.json({ ok: true });
 });

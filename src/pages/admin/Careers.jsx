@@ -3,6 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout.jsx';
 import Dialog from '../../components/admin/Dialog.jsx';
 import Select from '../../components/Select.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import CareerInterests from './CareerInterests.jsx';
 import { addCareerRole, deleteCareerRole, getCareers, reorderCareerRoles, saveCareerRole, saveCareerSettings } from '../../lib/careersApi.js';
 import { KINDS, STATUSES, STATUS_LABEL, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
 
@@ -385,6 +386,8 @@ export default function Careers() {
             )}
           </section>
         )}
+
+        {data && <CareerInterests />}
 
         {!data && !loadError && <p className="p-8 text-center text-sm text-muted">Loading…</p>}
       </div>
