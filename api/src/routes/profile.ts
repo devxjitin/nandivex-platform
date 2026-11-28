@@ -64,7 +64,13 @@ const text = (max: number) => z.string().trim().max(max, `Keep this under ${max}
 /** Text that must match a pattern when it is filled in. */
 const pattern = (re: RegExp, message: string, max = 60) =>
   z.string().trim().max(max).refine((v) => v === '' || re.test(v), message).transform((v) => v || null);
-const phone = pattern(/^(\+91[\s-]?)?[6-9]\d{9}$/, 'Enter a 10-digit mobile number.', 20);
+const phone = z
+  .string()
+  .trim()
+  .max(20)
+  .refine((v) => v === '' || /^(\+91[\s-]?)?[6-9]\d{9}$/.test(v), 'Enter a valid 10-digit mobile number. It starts with 6, 7, 8 or 9.')
+  .refine((v) => !/^(\+91[\s-]?)?(\d)\2{9}$/.test(v), 'Enter a real mobile number.')
+  .transform((v) => v || null);
 
 const PLACE_RE = /^[\p{L}][\p{L} .'()-]{1,59}$/u;
 const INDIAN_PINCODE = /^[1-9]\d{5}$/;
