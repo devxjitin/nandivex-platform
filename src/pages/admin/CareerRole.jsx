@@ -205,9 +205,9 @@ function RoleForm({ initial, isNew, onSave, onDelete }) {
       </div>
 
       <div className="flex flex-col-reverse gap-3 border-t border-line px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-1 sm:items-start xl:flex-row xl:items-center xl:gap-3">
           {!isNew && (
-            <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className="inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold text-red-600 transition hover:bg-red-500/10 disabled:opacity-40">
+            <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-semibold text-red-600 transition hover:bg-red-500/10 disabled:opacity-40">
               <TrashIcon /> Delete role
             </button>
           )}
