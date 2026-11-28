@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { ApprovalMeter, StatsTiles, TaskRows, taskStats, useNavToast } from '../components/tasks/PersonTasks.jsx';
@@ -16,7 +16,7 @@ const TABS = [['all', 'All'], ['pending', 'To do'], ['submitted', 'Under review'
 const avatarClass = 'grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-full bg-accent font-display text-lg font-bold text-white';
 
 /** One person: picture, name, role and where their tasks stand. Opens that person's tasks. */
-function PersonCard({ person, tasks }) {
+function PersonCard({ person, tasks, you }) {
   const s = taskStats(tasks);
   const open = s.pending + s.rejected;
   return (
@@ -24,7 +24,7 @@ function PersonCard({ person, tasks }) {
       <div className="flex items-center gap-3.5">
         <Avatar user={person} path={`/employees/${person.id}/photo`} className={avatarClass} />
         <div className="min-w-0">
-          <p className="truncate font-semibold">{person.name}</p>
+          <p className="truncate font-semibold">{person.name}{you && <span className="ml-1.5 text-xs font-semibold text-accent">(You)</span>}</p>
           <p className="truncate text-xs text-muted">{person.email}</p>
           <span className="mt-1.5 inline-flex rounded-full bg-tint px-2.5 py-0.5 text-xs font-semibold text-accent-dark">{person.role}</span>
         </div>
@@ -42,6 +42,7 @@ function PersonCard({ person, tasks }) {
 
 /** For a Founder, Co-Founder or Admin: everyone, with their numbers. A person's card opens their tasks. */
 function PeopleView() {
+  const { user } = useSession();
   const [people, setPeople] = useState(null);
   const [tasks, setTasks] = useState(null);
   const [error, setError] = useState('');
@@ -99,7 +100,7 @@ function PeopleView() {
             </div>
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {shown.map((p) => <li key={p.id}><PersonCard person={p} tasks={byPerson.get(p.id) || []} /></li>)}
+              {shown.map((p) => <li key={p.id}><PersonCard person={p} tasks={byPerson.get(p.id) || []} you={p.id === user?.id} /></li>)}
             </ul>
           )}
         </>
@@ -110,11 +111,16 @@ function PeopleView() {
 
 /** For everyone else: the tasks given to them. */
 function MyTasks() {
+  const { user } = useSession();
   const [tasks, setTasks] = useState(null);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
 
-  useEffect(() => { listTasks().then(setTasks).catch((err) => setError(err.message)); }, []);
+  useEffect(() => {
+    if (!user) return;
+    // Managers get every task from the API; only the ones given to this person belong here.
+    listTasks().then((all) => setTasks(all.filter((t) => t.assignee.id === user.id))).catch((err) => setError(err.message));
+  }, [user]);
 
   const all = tasks || [];
   const counts = { all: all.length, pending: 0, submitted: 0, rejected: 0, missed: 0, approved: 0 };
@@ -161,8 +167,32 @@ function MyTasks() {
   );
 }
 
+/** Founder, Co-Founder and Admin get two views: everyone's tasks, and the tasks given to themselves. */
+function ManagerTasks() {
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') === 'mine' ? 'mine' : 'people';
+  const { user } = useSession();
+  const canHaveTasks = !isAdminRole(user?.role || '');
+  const tabs = [['people', 'Everyone'], ['mine', 'My tasks']];
+  return (
+    <div className="space-y-6">
+      {canHaveTasks && (
+        <div className="flex gap-1.5" role="tablist" aria-label="Tasks view">
+          {tabs.map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => setParams(key === 'mine' ? { view: 'mine' } : {}, { replace: true })}
+              className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${view === key ? 'bg-accent text-white' : 'border border-line text-muted hover:bg-tint hover:text-accent'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {view === 'mine' && canHaveTasks ? <MyTasks /> : <PeopleView />}
+    </div>
+  );
+}
+
 export default function Tasks() {
   const { user } = useSession();
   useNavToast();
-  return <AdminLayout>{isManager(user) ? <PeopleView /> : <MyTasks />}</AdminLayout>;
+  return <AdminLayout>{isManager(user) ? <ManagerTasks /> : <MyTasks />}</AdminLayout>;
 }

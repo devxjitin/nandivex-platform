@@ -36,11 +36,11 @@ export default function Home() {
     listEmployees().then(setPeople).catch(() => setPeople([]));
   }, [manager]);
 
-  // Everyone else sees how their own tasks stand.
+  // Tasks given to this person (a manager sees the card only once they have one).
   useEffect(() => {
-    if (manager || !user) return;
-    listTasks().then(setMyTasks).catch(() => setMyTasks([]));
-  }, [manager, user]);
+    if (!user) return;
+    listTasks().then((all) => setMyTasks(all.filter((t) => t.assignee.id === user.id))).catch(() => setMyTasks([]));
+  }, [user]);
 
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -56,11 +56,11 @@ export default function Home() {
           </div>
         </section>
 
-        {!manager && myTasks && (
+        {myTasks && (!manager || myTasks.length > 0) && (
           <section className="rounded-2xl border border-line bg-surface shadow-card">
             <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-4 sm:px-8">
               <h2 className="text-base">My tasks</h2>
-              <Link to="/tasks" className="text-[13px] font-semibold text-accent transition hover:text-accent-dark">Open my tasks</Link>
+              <Link to={manager ? '/tasks?view=mine' : '/tasks'} className="text-[13px] font-semibold text-accent transition hover:text-accent-dark">Open my tasks</Link>
             </div>
             <div className="p-6 sm:p-8"><StatsTiles stats={taskStats(myTasks)} /></div>
           </section>
