@@ -28,10 +28,10 @@ export async function api(path, { method = 'GET', body } = {}) {
 }
 
 /** Downloads a file (the profile picture) as a Blob. Returns null when there is none. */
-export async function apiBlob(path) {
+export async function apiBlob(path, { cache } = {}) {
   let res;
   try {
-    res = await fetch(`${BASE}${path}`, { credentials: 'include' });
+    res = await fetch(`${BASE}${path}`, { credentials: 'include', cache });
   } catch {
     throw new ApiError('Cannot reach the server. Check your connection and try again.', 0);
   }

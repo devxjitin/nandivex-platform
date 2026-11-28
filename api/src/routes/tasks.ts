@@ -1,10 +1,12 @@
 import type { IncomingMessage } from 'node:http';
 import express, { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import type { Prisma, Task, TaskItem, TaskSubmission, User } from '@prisma/client';
 import { z } from 'zod';
+import { rateLimit } from 'express-rate-limit';
 import { requireAuth } from '../auth';
 import { prisma } from '../db';
+import { getLinkPreview } from '../linkPreview';
 import { notify, notifyManagers } from '../notify';
 import { isAdminRole, isManagerRole } from '../roles';
 
@@ -81,14 +83,27 @@ const submissionDto = (s: SubmissionWithReviewer) => ({
 });
 
 /** Loads the task if this person may see it (managers see all, everyone else only their own); otherwise answers 404. */
-async function load(req: Request, res: Response): Promise<TaskWithPeople | null> {
+async function load(req: Request, res: Response, db: Prisma.TransactionClient = prisma): Promise<TaskWithPeople | null> {
   const id = String(req.params.id);
-  const task = await prisma.task.findUnique({ where: { id }, include: PEOPLE });
+  const task = await db.task.findUnique({ where: { id }, include: PEOPLE });
   if (!task || (!isManager(req.user!) && task.assigneeId !== req.user!.id)) {
     res.status(404).json({ error: 'Task not found.' });
     return null;
   }
   return task;
+}
+
+function mutation(handler: (req: Request, res: Response) => Promise<unknown>): RequestHandler {
+  return (req, res, next) => { void handler(req, res).catch(next); };
+}
+
+// Serialize proof changes, hand-in, and review for the same task.
+function withTaskLock<T>(req: Request, res: Response, change: (db: Prisma.TransactionClient, task: TaskWithPeople) => Promise<T>) {
+  return prisma.$transaction(async (db) => {
+    await db.$queryRaw`SELECT "id" FROM "Task" WHERE "id" = ${String(req.params.id)} FOR UPDATE`;
+    const task = await load(req, res, db);
+    return task ? change(db, task) : null;
+  });
 }
 
 async function fullDto(task: TaskWithPeople) {
@@ -102,6 +117,7 @@ async function fullDto(task: TaskWithPeople) {
   ]);
   return {
     ...taskDto(task),
+    reviewVersion: task.updatedAt.toISOString(),
     brief: items.filter((i) => i.role === 'BRIEF').map(itemDto),
     draft: items.filter((i) => i.role === 'PROOF').map(itemDto),
     submissions: submissions.map(submissionDto),
@@ -186,22 +202,42 @@ tasksRouter.delete('/:id', async (req, res) => {
 
 // --- Items: the explanation (brief) and the proof ----------------------------------------------
 
-/** Who may add to or remove from a list: managers the brief (until approved), the assignee the proof (while it is theirs to give). */
-function listAccess(req: Request, res: Response, task: TaskWithPeople): 'BRIEF' | 'PROOF' | null {
+type ItemScope = Pick<TaskItem, 'taskId' | 'role' | 'submissionId'>;
+
+async function itemScope(req: Request, res: Response, db: Prisma.TransactionClient, task: TaskWithPeople): Promise<ItemScope | null> {
   const role = req.query.role === 'proof' ? 'PROOF' : req.query.role === 'brief' ? 'BRIEF' : null;
   if (!role) { res.status(400).json({ error: 'Say whether this is for the task or for the proof.' }); return null; }
   if (task.status === 'APPROVED') { res.status(409).json({ error: 'This task is already approved.' }); return null; }
   if (role === 'BRIEF') {
     if (!isManager(req.user!)) { res.status(403).json({ error: 'Only a Founder, Co-Founder or Admin can change the task.' }); return null; }
-    return role;
+    return { taskId: task.id, role, submissionId: null };
   }
-  if (task.assigneeId !== req.user!.id) { res.status(403).json({ error: 'Only the person the task is for can add proof.' }); return null; }
-  if (task.status === 'SUBMITTED') { res.status(409).json({ error: 'The proof is with a reviewer. Wait for the decision.' }); return null; }
-  return role;
+  if (task.assigneeId !== req.user!.id) { res.status(403).json({ error: 'Only the person the task is for can change proof.' }); return null; }
+  const submissionId = req.query.submissionId;
+  if (task.status !== 'SUBMITTED' && submissionId === undefined) return { taskId: task.id, role, submissionId: null };
+  if (task.status === 'SUBMITTED' && typeof submissionId === 'string') {
+    const latest = await db.taskSubmission.findFirst({ where: { taskId: task.id }, orderBy: { attempt: 'desc' }, select: { id: true, decision: true } });
+    if (latest?.id === submissionId && latest.decision === null) return { taskId: task.id, role, submissionId };
+  }
+  res.status(409).json({ error: 'The proof status changed. Reopen the task to see the latest version.' });
+  return null;
 }
 
-async function checkRoom(taskId: string, role: 'BRIEF' | 'PROOF', res: Response): Promise<boolean> {
-  const count = await prisma.taskItem.count({ where: { taskId, role, submissionId: null } });
+function changeItems<T>(req: Request, res: Response, change: (db: Prisma.TransactionClient, scope: ItemScope) => Promise<T | null>) {
+  return withTaskLock(req, res, async (db, task) => {
+    const scope = await itemScope(req, res, db, task);
+    if (!scope) return null;
+    const result = await change(db, scope);
+    if (result !== null && scope.submissionId) {
+      const updatedAt = new Date(Math.max(Date.now(), task.updatedAt.getTime() + 1));
+      await db.task.update({ where: { id: task.id }, data: { updatedAt } });
+    }
+    return result;
+  });
+}
+
+async function checkRoom(db: Prisma.TransactionClient, scope: ItemScope, res: Response): Promise<boolean> {
+  const count = await db.taskItem.count({ where: scope });
   if (count >= MAX_ITEMS) { res.status(400).json({ error: `You can add up to ${MAX_ITEMS} items.` }); return false; }
   return true;
 }
@@ -214,51 +250,83 @@ const linkItem = z.object({
   }, 'Enter a full link that starts with http:// or https://'),
 });
 
-tasksRouter.post('/:id/items', async (req, res) => {
-  const task = await load(req, res);
-  if (!task) return;
-  const role = listAccess(req, res, task);
-  if (!role) return;
+tasksRouter.post('/link-preview', rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  keyGenerator: (req) => req.user!.id,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}), mutation(async (req, res) => {
+  const parsed = linkItem.safeParse({ kind: 'link', url: req.body?.url });
+  if (!parsed.success) return res.status(400).json({ error: 'Enter a valid link.' });
+  res.json({ preview: await getLinkPreview(parsed.data.url) });
+}));
+
+tasksRouter.post('/:id/items', mutation(async (req, res) => {
   const parsed = z.discriminatedUnion('kind', [textItem, linkItem]).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check what you entered.' });
-  if (!(await checkRoom(task.id, role, res))) return;
   const d = parsed.data;
-  const item = await prisma.taskItem.create({
-    data: d.kind === 'text' ? { taskId: task.id, role, kind: 'TEXT', text: d.text } : { taskId: task.id, role, kind: 'LINK', url: d.url },
+  const item = await changeItems(req, res, async (db, scope) => {
+    if (!(await checkRoom(db, scope, res))) return null;
+    return db.taskItem.create({ data: d.kind === 'text' ? { ...scope, kind: 'TEXT', text: d.text } : { ...scope, kind: 'LINK', url: d.url } });
   });
-  return res.status(201).json({ item: itemDto(item) });
-});
+  if (item) res.status(201).json({ item: itemDto(item) });
+}));
+
+tasksRouter.patch('/:id/items/:itemId', mutation(async (req, res) => {
+  const parsed = z.discriminatedUnion('kind', [textItem, linkItem]).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check what you entered.' });
+  const d = parsed.data;
+  const item = await changeItems(req, res, async (db, scope) => {
+    const kind = d.kind === 'text' ? 'TEXT' : 'LINK';
+    const id = String(req.params.itemId);
+    const current = await db.taskItem.findFirst({ where: { ...scope, id, kind }, select: { id: true } });
+    if (!current) { res.status(404).json({ error: 'Item not found.' }); return null; }
+    return db.taskItem.update({ where: { id }, data: d.kind === 'text' ? { text: d.text } : { url: d.url } });
+  });
+  if (item) res.json({ item: itemDto(item) });
+}));
 
 const allowedFile = (req: IncomingMessage) => FILE_TYPES.has(String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase());
 
-tasksRouter.put('/:id/files', express.raw({ type: allowedFile, limit: MAX_FILE_BYTES }), async (req, res) => {
-  const task = await load(req, res);
-  if (!task) return;
-  const role = listAccess(req, res, task);
-  if (!role) return;
+tasksRouter.put('/:id/files/:itemId?', express.raw({ type: allowedFile, limit: MAX_FILE_BYTES }), mutation(async (req, res) => {
   const body = req.body as Buffer;
   if (!Buffer.isBuffer(body) || body.length === 0) {
     return res.status(400).json({ error: 'That file type is not supported. Use an image, audio, video, PDF, text, Office document or zip file.' });
   }
-  if (!(await checkRoom(task.id, role, res))) return;
   const contentType = String(req.headers['content-type']).split(';')[0].trim().toLowerCase();
   const fileName = String(req.query.name ?? 'file').replace(/[\\/\r\n"]/g, '_').trim().slice(0, 120) || 'file';
-  const item = await prisma.taskItem.create({
-    data: { taskId: task.id, role, kind: 'FILE', fileName, contentType, size: body.length, file: { create: { data: new Uint8Array(body) } } },
+  const data = { fileName, contentType, size: body.length };
+  const bytes = new Uint8Array(body);
+  const itemId = req.params.itemId;
+  const item = await changeItems(req, res, async (db, scope) => {
+    if (itemId) {
+      const current = await db.taskItem.findFirst({ where: { ...scope, id: itemId, kind: 'FILE' }, select: { id: true } });
+      if (!current) { res.status(404).json({ error: 'File not found.' }); return null; }
+      return db.taskItem.update({ where: { id: itemId }, data: { ...data, file: { upsert: { create: { data: bytes }, update: { data: bytes } } } } });
+    }
+    if (!(await checkRoom(db, scope, res))) return null;
+    return db.taskItem.create({ data: { ...scope, ...data, kind: 'FILE', file: { create: { data: bytes } } } });
   });
-  return res.status(201).json({ item: itemDto(item) });
-});
+  if (item) res.status(itemId ? 200 : 201).json({ item: itemDto(item) });
+}));
 
-tasksRouter.delete('/:id/items/:itemId', async (req, res) => {
-  const task = await load(req, res);
-  if (!task) return;
-  const role = listAccess(req, res, task);
-  if (!role) return;
-  // Proof that was already handed in stays as the record; only the current draft can be removed.
-  const gone = await prisma.taskItem.deleteMany({ where: { id: String(req.params.itemId), taskId: task.id, role, ...(role === 'PROOF' ? { submissionId: null } : {}) } });
-  if (gone.count === 0) return res.status(404).json({ error: 'Item not found.' });
-  res.status(204).end();
-});
+tasksRouter.delete('/:id/items/:itemId', mutation(async (req, res) => {
+  const removed = await changeItems(req, res, async (db, scope) => {
+    const where = { ...scope, id: String(req.params.itemId) };
+    if (!(await db.taskItem.findFirst({ where, select: { id: true } }))) {
+      res.status(404).json({ error: 'Item not found.' });
+      return null;
+    }
+    if (scope.submissionId && await db.taskItem.count({ where: scope }) <= 1) {
+      res.status(409).json({ error: 'Keep at least one item in submitted proof.' });
+      return null;
+    }
+    await db.taskItem.delete({ where: { id: where.id } });
+    return true;
+  });
+  if (removed) res.status(204).end();
+}));
 
 tasksRouter.get('/:id/items/:itemId/file', async (req, res) => {
   const task = await load(req, res);
@@ -270,7 +338,7 @@ tasksRouter.get('/:id/items/:itemId/file', async (req, res) => {
   res.setHeader('Content-Type', type);
   res.setHeader('Content-Disposition', `${INLINE(type) ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(item.fileName ?? 'file')}`);
   res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Accept-Ranges', 'bytes');
   // Audio and video players ask for slices so they can skip ahead.
   const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
@@ -290,55 +358,66 @@ tasksRouter.get('/:id/items/:itemId/file', async (req, res) => {
 
 // --- Hand in proof, review ---------------------------------------------------------------------
 
-tasksRouter.post('/:id/submit', async (req, res) => {
-  const task = await load(req, res);
-  if (!task) return;
-  if (task.assigneeId !== req.user!.id) return res.status(403).json({ error: 'Only the person the task is for can hand in proof.' });
-  if (task.status !== 'PENDING' && task.status !== 'REJECTED') return res.status(409).json({ error: 'This task is not waiting for proof.' });
-  const parsed = z.object({ note: z.string().trim().max(1000, 'Keep the note under 1000 characters.').optional().default('') }).safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the note.' });
-  const draft = await prisma.taskItem.findMany({ where: { taskId: task.id, role: 'PROOF', submissionId: null }, select: { id: true } });
-  if (draft.length === 0) return res.status(400).json({ error: 'Add some proof first: text, a link or a file.' });
-  const attempts = await prisma.taskSubmission.count({ where: { taskId: task.id } });
-  await prisma.$transaction([
-    prisma.taskSubmission.create({
-      data: { taskId: task.id, attempt: attempts + 1, note: parsed.data.note || null, items: { connect: draft.map((i) => ({ id: i.id })) } },
-    }),
-    prisma.task.update({ where: { id: task.id }, data: { status: 'SUBMITTED', completedAt: null } }),
-  ]);
-  await notifyManagers({ type: 'task_submitted', title: `${req.user!.name} handed in proof`, body: task.title, link: `/tasks/${task.id}` }, req.user!.id);
-  const fresh = await prisma.task.findUniqueOrThrow({ where: { id: task.id }, include: PEOPLE });
-  res.json({ task: await fullDto(fresh) });
-});
+const proofNote = z.string().trim().max(1000, 'Keep the note under 1000 characters.');
 
-tasksRouter.post('/:id/review', async (req, res) => {
+tasksRouter.patch('/:id/proof-note', mutation(async (req, res) => {
+  const parsed = z.object({ note: proofNote }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the note.' });
+  if (req.query.role !== 'proof' || typeof req.query.submissionId !== 'string') return res.status(400).json({ error: 'Choose the proof submission to edit.' });
+  const { note } = parsed.data;
+  const saved = await changeItems(req, res, async (db, scope) => {
+    if (!scope.submissionId) return null;
+    return db.taskSubmission.update({ where: { id: scope.submissionId }, data: { note: note || null }, select: { id: true } });
+  });
+  if (saved) res.json({ note });
+}));
+
+tasksRouter.post('/:id/submit', mutation(async (req, res) => {
+  const parsed = z.object({ note: proofNote.optional().default('') }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the note.' });
+  const saved = await withTaskLock(req, res, async (db, task) => {
+    if (task.assigneeId !== req.user!.id) { res.status(403).json({ error: 'Only the person the task is for can hand in proof.' }); return null; }
+    if (task.status !== 'PENDING' && task.status !== 'REJECTED') { res.status(409).json({ error: 'This task is not waiting for proof.' }); return null; }
+    const draft = await db.taskItem.findMany({ where: { taskId: task.id, role: 'PROOF', submissionId: null }, select: { id: true } });
+    if (draft.length === 0) { res.status(400).json({ error: 'Add some proof first: text, a link or a file.' }); return null; }
+    const attempts = await db.taskSubmission.count({ where: { taskId: task.id } });
+    await db.taskSubmission.create({
+      data: { taskId: task.id, attempt: attempts + 1, note: parsed.data.note || null, items: { connect: draft.map((i) => ({ id: i.id })) } },
+    });
+    return db.task.update({ where: { id: task.id }, data: { status: 'SUBMITTED', completedAt: null }, include: PEOPLE });
+  });
+  if (!saved) return;
+  await notifyManagers({ type: 'task_submitted', title: `${req.user!.name} handed in proof`, body: saved.title, link: `/tasks/${saved.id}` }, req.user!.id);
+  res.json({ task: await fullDto(saved) });
+}));
+
+tasksRouter.post('/:id/review', mutation(async (req, res) => {
   if (!requireManagerHere(req, res)) return;
-  const task = await load(req, res);
-  if (!task) return;
-  if (task.assigneeId === req.user!.id) return res.status(403).json({ error: 'Someone else has to review your own task.' });
-  if (task.status !== 'SUBMITTED') return res.status(409).json({ error: 'There is no proof waiting for a decision.' });
   const parsed = z
-    .object({ decision: z.enum(['approve', 'reject']), note: z.string().trim().max(1000, 'Keep the note under 1000 characters.').optional().default('') })
+    .object({ decision: z.enum(['approve', 'reject']), note: proofNote.optional().default(''), reviewVersion: z.string().datetime() })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the decision.' });
-  const { decision, note } = parsed.data;
+  const { decision, note, reviewVersion } = parsed.data;
   if (decision === 'reject' && !note) return res.status(400).json({ error: 'Tell them what is missing, so they know what to add.' });
-  const latest = await prisma.taskSubmission.findFirst({ where: { taskId: task.id }, orderBy: { attempt: 'desc' } });
-  if (!latest) return res.status(409).json({ error: 'There is no proof waiting for a decision.' });
   const approved = decision === 'approve';
-  await prisma.$transaction([
-    prisma.taskSubmission.update({
+  const saved = await withTaskLock(req, res, async (db, task) => {
+    if (task.assigneeId === req.user!.id) { res.status(403).json({ error: 'Someone else has to review your own task.' }); return null; }
+    if (task.status !== 'SUBMITTED') { res.status(409).json({ error: 'There is no proof waiting for a decision.' }); return null; }
+    if (task.updatedAt.toISOString() !== reviewVersion) { res.status(409).json({ error: 'The task changed. Check the latest proof before reviewing.' }); return null; }
+    const latest = await db.taskSubmission.findFirst({ where: { taskId: task.id }, orderBy: { attempt: 'desc' } });
+    if (!latest || latest.decision) { res.status(409).json({ error: 'There is no proof waiting for a decision.' }); return null; }
+    await db.taskSubmission.update({
       where: { id: latest.id },
       data: { decision: approved ? 'APPROVED' : 'REJECTED', reviewNote: note || null, reviewedById: req.user!.id, reviewedAt: new Date() },
-    }),
-    prisma.task.update({ where: { id: task.id }, data: { status: approved ? 'APPROVED' : 'REJECTED', completedAt: approved ? new Date() : null } }),
-  ]);
-  await notify([task.assigneeId], {
+    });
+    return db.task.update({ where: { id: task.id }, data: { status: approved ? 'APPROVED' : 'REJECTED', completedAt: approved ? new Date() : null }, include: PEOPLE });
+  });
+  if (!saved) return;
+  await notify([saved.assigneeId], {
     type: approved ? 'task_approved' : 'task_rejected',
     title: approved ? 'Your task was approved' : 'Your task needs more proof',
-    body: approved ? task.title : `${task.title}: ${note}`,
-    link: `/tasks/${task.id}`,
+    body: approved ? saved.title : `${saved.title}: ${note}`,
+    link: `/tasks/${saved.id}`,
   });
-  const fresh = await prisma.task.findUniqueOrThrow({ where: { id: task.id }, include: PEOPLE });
-  res.json({ task: await fullDto(fresh) });
-});
+  res.json({ task: await fullDto(saved) });
+}));
