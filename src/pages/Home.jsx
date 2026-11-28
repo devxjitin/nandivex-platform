@@ -4,7 +4,6 @@ import AdminLayout from '../components/admin/AdminLayout.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { isLeadership } from '../data/roles.js';
 import { listEmployees } from '../lib/employeesApi.js';
-import { getProfile } from '../lib/profileApi.js';
 import { isManager, useSession } from '../lib/session.jsx';
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -13,20 +12,6 @@ const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p)
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-}
-
-/** What a complete profile has, so the home page can say how far along it is. */
-function checklist(p, hasPhoto) {
-  const addressed = ['line1', 'city', 'state', 'pincode'].every((k) => (p.currentAddress[k] || '').trim());
-  return [
-    { label: 'Profile photo', done: hasPhoto },
-    { label: 'Date of birth', done: !!p.dateOfBirth },
-    { label: 'Mobile number', done: !!p.phone },
-    { label: 'Emergency contact', done: !!(p.emergencyName && p.emergencyPhone) },
-    { label: 'Current address', done: addressed },
-    { label: 'PAN number', done: p.pan.saved },
-    { label: 'Bank details', done: !!(p.bank.accountSaved && p.bank.ifsc && p.bank.holder) },
-  ];
 }
 
 function Stat({ label, value }) {
@@ -38,31 +23,16 @@ function Stat({ label, value }) {
   );
 }
 
-function Tick({ done }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={done ? 'text-emerald-600' : 'text-muted/50'}>
-      {done ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <circle cx="12" cy="12" r="3" />}
-    </svg>
-  );
-}
-
 export default function Home() {
   const { user } = useSession();
   const manager = isManager(user);
-  const [items, setItems] = useState(null);
   const [people, setPeople] = useState(null);
-
-  useEffect(() => {
-    getProfile().then((p) => setItems(checklist(p, !!user?.photoVersion))).catch(() => setItems([]));
-  }, [user?.photoVersion]);
 
   useEffect(() => {
     if (!manager) return;
     listEmployees().then(setPeople).catch(() => setPeople([]));
   }, [manager]);
 
-  const done = items ? items.filter((i) => i.done).length : 0;
-  const percent = items && items.length ? Math.round((done / items.length) * 100) : 0;
   const firstName = (user?.name || '').trim().split(/\s+/)[0];
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -76,29 +46,6 @@ export default function Home() {
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
         </section>
-
-        {items && items.length > 0 && percent < 100 && (
-          <section className="rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg">Complete your profile</h2>
-                <p className="mt-1 text-sm text-muted">{done} of {items.length} done</p>
-              </div>
-              <Link to="/profile" className="btn-solid !py-2.5">Open profile</Link>
-            </div>
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label="Profile completed">
-              <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${percent}%` }} />
-            </div>
-            <ul className="mt-5 grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              {items.map((i) => (
-                <li key={i.label} className={`flex items-center gap-2 ${i.done ? 'text-ink' : 'text-muted'}`}>
-                  <Tick done={i.done} />
-                  {i.label}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
 
         {manager && (
           <>

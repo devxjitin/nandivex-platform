@@ -4,7 +4,8 @@ import AdminLayout from '../../components/admin/AdminLayout.jsx';
 import Dialog from '../../components/admin/Dialog.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import Avatar from '../../components/Avatar.jsx';
-import { getEmployeeProfile, removeEmployee, resetPassword, revealSecret } from '../../lib/employeesApi.js';
+import RoleSelect, { roleNameOk } from '../../components/RoleSelect.jsx';
+import { getEmployeeProfile, removeEmployee, resetPassword, revealSecret, updateEmployee } from '../../lib/employeesApi.js';
 import { useSession } from '../../lib/session.jsx';
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -64,6 +65,71 @@ const addressText = (a) => {
   if (![a.line1, a.line2, a.city, a.state, a.pincode].some((x) => x && x.trim())) return '';
   return [a.line1, a.line2, [a.city, a.state].filter(Boolean).join(', '), [a.pincode, a.country].filter(Boolean).join(' ')].filter((x) => x && x.trim()).join('\n');
 };
+
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Name, email and role are set by an admin. The employee cannot change them, so this is the only place they are edited. */
+function AccountCard({ id, p, onSaved }) {
+  const { user: me, setUser } = useSession();
+  const toast = useToast();
+  const [v, setV] = useState({ name: p.fullName, email: p.email, role: p.role });
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const dirty = v.name !== p.fullName || v.email !== p.email || v.role !== p.role;
+  const set = (k) => (val) => { setV((x) => ({ ...x, [k]: val })); setErrors((x) => ({ ...x, [k]: undefined })); };
+
+  async function save(e) {
+    e.preventDefault();
+    const found = {};
+    if (v.name.trim().length < 2) found.name = 'Enter the full name.';
+    if (!emailRe.test(v.email.trim())) found.email = 'Enter a valid email address.';
+    if (!v.role.trim()) found.role = 'Choose a role.';
+    else if (!roleNameOk(v.role)) found.role = 'Role name: 2 to 40 characters, letters and numbers only.';
+    setErrors(found);
+    if (Object.keys(found).length) return;
+    setBusy(true);
+    try {
+      const updated = await updateEmployee(id, v);
+      if (me?.id === id) setUser(updated);
+      onSaved(updated);
+      toast.success('Account details saved');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const input = (k) => `field ${errors[k] ? 'field-error' : ''}`;
+  return (
+    <section className="rounded-2xl border border-line bg-surface shadow-card">
+      <h2 className="border-b border-line px-6 py-4 text-base sm:px-8">Account</h2>
+      <form onSubmit={save} noValidate className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
+        <div>
+          <label htmlFor="acc-name" className="mb-1.5 block text-sm font-semibold">Full name</label>
+          <input id="acc-name" value={v.name} onChange={(e) => set('name')(e.target.value)} autoComplete="off" aria-invalid={!!errors.name} className={input('name')} />
+          {errors.name && <p className="mt-1.5 text-[13px] text-red-500">{errors.name}</p>}
+        </div>
+        <div>
+          <label htmlFor="acc-email" className="mb-1.5 block text-sm font-semibold">Email</label>
+          <input id="acc-email" type="email" value={v.email} onChange={(e) => set('email')(e.target.value)} autoComplete="off" aria-invalid={!!errors.email} className={input('email')} />
+          {errors.email && <p className="mt-1.5 text-[13px] text-red-500">{errors.email}</p>}
+        </div>
+        <div>
+          <label htmlFor="acc-role" className="mb-1.5 block text-sm font-semibold">Role</label>
+          <RoleSelect id="acc-role" value={v.role} onChange={set('role')} invalid={!!errors.role} />
+          {errors.role && <p className="mt-1.5 text-[13px] text-red-500">{errors.role}</p>}
+        </div>
+        <div className="flex items-end gap-3 sm:justify-end">
+          {dirty && !busy && (
+            <button type="button" onClick={() => { setV({ name: p.fullName, email: p.email, role: p.role }); setErrors({}); }} className="text-[13px] font-semibold text-muted transition hover:text-accent">Discard</button>
+          )}
+          <button type="submit" disabled={!dirty || busy} className="btn-solid !px-5 !py-2.5 text-[13px]">{busy ? 'Saving…' : 'Save changes'}</button>
+        </div>
+      </form>
+    </section>
+  );
+}
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -133,17 +199,13 @@ export default function EmployeeProfile() {
             </div>
           </section>
 
+          <AccountCard key={`${p.fullName}|${p.email}|${p.role}`} id={id} p={p} onSaved={(u) => setP((x) => ({ ...x, fullName: u.name, email: u.email, role: u.role }))} />
+
           <Card title="Personal">
             <Item label="Date of birth" value={fmtDob(p.dateOfBirth)} />
             <Item label="Mobile number" value={p.phone} />
             <Item label="Gender" value={p.gender} />
             <Item label="Blood group" value={p.bloodGroup} />
-          </Card>
-
-          <Card title="Emergency contact">
-            <Item label="Name" value={p.emergencyName} />
-            <Item label="Relationship" value={p.emergencyRelation} />
-            <Item label="Mobile number" value={p.emergencyPhone} />
           </Card>
 
           <Card title="Address">

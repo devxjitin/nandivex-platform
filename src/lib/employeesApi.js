@@ -36,3 +36,9 @@ export async function revealSecret(id, field) {
   const { value } = await api(`/employees/${id}/profile/reveal`, { method: 'POST', body: { field } });
   return value;
 }
+
+/** Changes a person's name, email and role. Returns the updated employee. */
+export async function updateEmployee(id, { name, email, role }) {
+  const { employee } = await api(`/employees/${id}`, { method: 'PATCH', body: { name, email, role } });
+  return employee;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBlocker } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
@@ -6,6 +6,7 @@ import Dialog from '../components/admin/Dialog.jsx';
 import Avatar from '../components/Avatar.jsx';
 import Checkbox from '../components/Checkbox.jsx';
 import DatePicker from '../components/DatePicker.jsx';
+import ProfileProgress, { checklist } from '../components/ProfileProgress.jsx';
 import Select from '../components/Select.jsx';
 import { COUNTRIES, INDIAN_STATES, lookupPincode } from '../lib/places.js';
 import { getProfile, removePhoto, resizeImage, saveProfile, uploadPhoto } from '../lib/profileApi.js';
@@ -31,7 +32,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 function validate(f, extra) {
   const e = {};
   if (f.phone.trim() && !phoneRe.test(f.phone.trim())) e.phone = 'Enter a 10-digit mobile number.';
-  if (f.emergencyPhone.trim() && !phoneRe.test(f.emergencyPhone.trim())) e.emergencyPhone = 'Enter a 10-digit mobile number.';
   if (f.dateOfBirth && f.dateOfBirth > today()) e.dateOfBirth = 'Date of birth cannot be in the future.';
   if (f.currentAddress.pincode.trim() && !/^\d{6}$/.test(f.currentAddress.pincode.trim())) e.currentPincode = 'Pincode is 6 digits.';
   if (!extra.same && f.permanentAddress.pincode.trim() && !/^\d{6}$/.test(f.permanentAddress.pincode.trim())) e.permanentPincode = 'Pincode is 6 digits.';
@@ -161,6 +161,7 @@ export default function Profile() {
   const { user, setUser } = useSession();
   const toast = useToast();
   const [form, setForm] = useState(null);
+  const [saved, setSaved] = useState(null); // the profile as last loaded or saved, for the completion card
   const [meta, setMeta] = useState(null); // read-only parts: email, role, createdAt, saved PAN / account
   const [same, setSame] = useState(true);
   const [editPan, setEditPan] = useState(false);
@@ -178,6 +179,7 @@ export default function Profile() {
   const [snapshot, setSnapshot] = useState('');
 
   function apply(p) {
+    setSaved(p);
     setMeta({ email: p.email, role: p.role, createdAt: p.createdAt, pan: p.pan, accountSaved: p.bank.accountSaved, accountLast4: p.bank.accountLast4 });
     const next = {
       dateOfBirth: p.dateOfBirth, gender: p.gender, bloodGroup: p.bloodGroup, phone: p.phone,
@@ -254,6 +256,8 @@ export default function Profile() {
     }
   }
 
+  const progress = useMemo(() => (saved ? checklist(saved, !!user?.photoVersion) : null), [saved, user?.photoVersion]);
+
   const dirty = !!form && snapshot !== '' && JSON.stringify({ form, same }) !== snapshot;
 
   // Leaving this page (a link, the back button) with unsaved changes asks first.
@@ -298,6 +302,8 @@ export default function Profile() {
 
       {form && meta && (
         <div className="space-y-6">
+          <ProfileProgress items={progress} />
+
           {/* Picture and who this is */}
           <section className="flex flex-col gap-6 rounded-2xl border border-line bg-surface p-6 shadow-card sm:flex-row sm:items-center sm:p-8">
             <Avatar user={user} className="grid h-24 w-24 flex-none place-items-center overflow-hidden rounded-full bg-accent font-display text-3xl font-bold text-white" />
@@ -336,14 +342,6 @@ export default function Profile() {
               </Field>
               <Field id="pf-blood" label="Blood group">
                 <Select id="pf-blood" value={form.bloodGroup} onChange={(v) => { setForm((f) => ({ ...f, bloodGroup: v })); }} clearLabel="Not specified" options={BLOOD_GROUPS.map((g) => ({ value: g, label: g }))} />
-              </Field>
-            </Card>
-
-            <Card title="Emergency contact">
-              <Field id="pf-em-name" label="Name"><input id="pf-em-name" value={form.emergencyName} onChange={set('emergencyName')} autoComplete="off" className="field" /></Field>
-              <Field id="pf-em-rel" label="Relationship"><input id="pf-em-rel" value={form.emergencyRelation} onChange={set('emergencyRelation')} autoComplete="off" placeholder="e.g. Father" className="field" /></Field>
-              <Field id="pf-em-phone" label="Mobile number" error={errors.emergencyPhone}>
-                <input id="pf-em-phone" type="tel" value={form.emergencyPhone} onChange={set('emergencyPhone')} className={cls('emergencyPhone')} />
               </Field>
             </Card>
 
