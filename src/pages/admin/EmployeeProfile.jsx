@@ -120,9 +120,9 @@ function AccountCard({ id, p, onSaved }) {
           <RoleSelect id="acc-role" value={v.role} onChange={set('role')} invalid={!!errors.role} />
           {errors.role && <p className="mt-1.5 text-[13px] text-red-500">{errors.role}</p>}
         </div>
-        <div className="flex items-end gap-3 sm:justify-end">
+        <div className="flex items-center gap-4 sm:justify-end sm:self-end">
           {dirty && !busy && (
-            <button type="button" onClick={() => { setV({ name: p.fullName, email: p.email, role: p.role }); setErrors({}); }} className="text-[13px] font-semibold text-muted transition hover:text-accent">Discard</button>
+            <button type="button" onClick={() => { setV({ name: p.fullName, email: p.email, role: p.role }); setErrors({}); }} className="text-[13px] font-semibold leading-none text-muted transition hover:text-accent">Discard</button>
           )}
           <button type="submit" disabled={!dirty || busy} className="btn-solid !px-5 !py-2.5 text-[13px]">{busy ? 'Saving…' : 'Save changes'}</button>
         </div>
