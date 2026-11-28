@@ -7,7 +7,7 @@ import { ItemAdder, ItemList, StatusBadge, TrashIcon } from '../components/tasks
 import { useToast } from '../components/Toast.jsx';
 import { isManager, useSession } from '../lib/session.jsx';
 import { fileType, fmtDate, fmtDateTime, isOverdue, today } from '../lib/taskRules.js';
-import { addFileItem, addLinkItem, addTextItem, deleteTask, getTask, removeItem, reviewTask, submitProof, updateTask } from '../lib/tasksApi.js';
+import { deleteTask, getTask, removeItem, reviewTask, saveItem, submitProof, updateProofNote, updateTask } from '../lib/tasksApi.js';
 
 const Card = ({ title, hint, children, footer }) => (
   <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
@@ -47,6 +47,8 @@ export default function TaskDetail() {
   const [reviewNote, setReviewNote] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [editing, setEditing] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingNote, setEditingNote] = useState(null);
   const [editError, setEditError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -63,6 +65,8 @@ export default function TaskDetail() {
 
   const closeDelete = useCallback(() => setConfirmDelete(false), []);
   const closeEdit = useCallback(() => setEditing(null), []);
+  const closeItem = useCallback(() => setEditingItem(null), []);
+  const closeNote = useCallback(() => setEditingNote(null), []);
 
   if (loadError) {
     return (
@@ -80,6 +84,8 @@ export default function TaskDetail() {
   const late = isOverdue(task);
   const canGiveProof = mine && (task.status === 'pending' || task.status === 'rejected');
   const canReview = manager && !mine && task.status === 'submitted';
+  const canEditMaterial = manager && task.status !== 'approved';
+  const activeProof = mine && task.status === 'submitted' ? task.submissions.at(-1) : null;
   const lastRejected = [...task.submissions].reverse().find((s) => s.decision === 'rejected');
 
   /** Runs a call, shows its error as a toast, and returns whether it worked. */
@@ -87,17 +93,29 @@ export default function TaskDetail() {
     try { await fn(); return true; } catch (err) { toast.error(err.message); return false; }
   }
 
-  // Adds to the task's explanation (managers) or to the proof (the assignee) straight away.
-  const addTo = (role) => async ({ kind, text, url, file }) => {
-    const item = kind === 'text' ? await addTextItem(task.id, role, text) : kind === 'link' ? await addLinkItem(task.id, role, url) : await addFileItem(task.id, role, file, fileType(file));
-    setTask((t) => ({ ...t, ...(role === 'brief' ? { brief: [...t.brief, item] } : { draft: [...t.draft, item] }) }));
+  function changeList(role, submissionId, change) {
+    setTask((t) => {
+      if (submissionId) return { ...t, submissions: t.submissions.map((s) => s.id === submissionId ? { ...s, items: change(s.items) } : s) };
+      const key = role === 'brief' ? 'brief' : 'draft';
+      return { ...t, [key]: change(t[key]) };
+    });
+  }
+
+  const saveTo = (role, submissionId, existing) => async ({ kind, text, url, file }) => {
+    const item = await saveItem(task.id, role, { kind, text, url, file, type: file ? fileType(file) : undefined }, { itemId: existing?.id, submissionId });
+    changeList(role, submissionId, (items) => existing
+      ? items.map((i) => i.id === item.id ? { ...item, fileRevision: (i.fileRevision ?? 0) + 1 } : i)
+      : [...items, item]);
+    if (existing) closeItem();
   };
 
-  const removeFrom = (role) => async (item) => {
+  const editIn = (role, submissionId) => (item) => setEditingItem({ role, submissionId, item });
+
+  const removeFrom = (role, submissionId) => async (item) => {
     setBusyId(item.id);
     await run(async () => {
-      await removeItem(task.id, role, item.id);
-      setTask((t) => ({ ...t, ...(role === 'brief' ? { brief: t.brief.filter((i) => i.id !== item.id) } : { draft: t.draft.filter((i) => i.id !== item.id) }) }));
+      await removeItem(task.id, role, item.id, submissionId);
+      changeList(role, submissionId, (items) => items.filter((i) => i.id !== item.id));
     });
     setBusyId(null);
   };
@@ -116,12 +134,31 @@ export default function TaskDetail() {
     setReviewError('');
     if (decision === 'reject' && !reviewNote.trim()) return setReviewError('Tell them what is missing, so they know what to add.');
     setBusy(true);
-    await run(async () => {
-      setTask(await reviewTask(task.id, decision, reviewNote.trim()));
+    try {
+      setTask(await reviewTask(task.id, decision, reviewNote.trim(), task.reviewVersion));
       setReviewNote('');
       toast.success(decision === 'approve' ? 'Task approved' : 'Sent back for more proof');
-    });
-    setBusy(false);
+    } catch (err) {
+      toast.error(err.message);
+      if (err.status === 409) await run(async () => setTask(await getTask(task.id)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveNote(e) {
+    e.preventDefault();
+    setBusy(true);
+    setEditError('');
+    try {
+      const saved = await updateProofNote(task.id, editingNote.id, editingNote.note);
+      setTask((t) => ({ ...t, submissions: t.submissions.map((s) => s.id === editingNote.id ? { ...s, note: saved } : s) }));
+      closeNote();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveEdit(e) {
@@ -177,25 +214,28 @@ export default function TaskDetail() {
           {task.description && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{task.description}</p>}
         </Card>
 
-        {(task.brief.length > 0 || (manager && task.status !== 'approved')) && (
+        {(task.brief.length > 0 || canEditMaterial) && (
           <Card title="Material" hint={manager ? 'What the assignee needs to do this. Text, links, videos, audio, documents.' : undefined}>
-            <ItemList taskId={task.id} items={task.brief} onRemove={manager && task.status !== 'approved' ? removeFrom('brief') : undefined} busyId={busyId} />
-            {manager && task.status !== 'approved' && <ItemAdder onAdd={addTo('brief')} disabled={task.brief.length >= 20} hint={task.brief.length >= 20 ? 'You can add up to 20 items.' : ''} />}
+            <ItemList taskId={task.id} items={task.brief} onRemove={canEditMaterial && removeFrom('brief')} onEdit={canEditMaterial && editIn('brief')} busyId={busyId} />
+            {canEditMaterial && <ItemAdder onAdd={saveTo('brief')} disabled={task.brief.length >= 20} hint={task.brief.length >= 20 ? 'You can add up to 20 items.' : ''} />}
           </Card>
         )}
 
-        {task.submissions.map((s) => (
-          <Card key={s.id} title={`Proof, attempt ${s.attempt}`} hint={`Handed in ${fmtDateTime(s.submittedAt)}`}>
+        {task.submissions.map((s) => {
+          const canEdit = activeProof?.id === s.id && !s.decision;
+          return <Card key={s.id} title={`Proof, attempt ${s.attempt}`} hint={`Handed in ${fmtDateTime(s.submittedAt)}`}>
             {s.note && <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{s.note}</p>}
-            <ItemList taskId={task.id} items={s.items} />
+            {canEdit && <button type="button" onClick={() => { setEditError(''); setEditingNote({ id: s.id, note: s.note }); }} className="btn-line !py-2 text-[13px]">{s.note ? 'Edit reviewer note' : 'Add reviewer note'}</button>}
+            <ItemList taskId={task.id} items={s.items} onEdit={canEdit && editIn('proof', s.id)} onRemove={canEdit && s.items.length > 1 && removeFrom('proof', s.id)} busyId={busyId} version={task.reviewVersion} />
+            {canEdit && <ItemAdder onAdd={saveTo('proof', s.id)} disabled={s.items.length >= 20} hint={s.items.length >= 20 ? 'You can add up to 20 items.' : ''} />}
             {s.decision && (
               <div className={`rounded-xl border px-4 py-3 text-sm ${s.decision === 'approved' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-800' : 'border-red-500/30 bg-red-500/5 text-red-700'}`}>
                 <p className="font-semibold">{s.decision === 'approved' ? 'Approved' : 'Sent back'} by {s.reviewedBy || 'a reviewer'}{s.reviewedAt ? `, ${fmtDateTime(s.reviewedAt)}` : ''}</p>
                 {s.reviewNote && <p className="mt-1 whitespace-pre-wrap break-words">{s.reviewNote}</p>}
               </div>
             )}
-          </Card>
-        ))}
+          </Card>;
+        })}
 
         {canGiveProof && (
           <Card
@@ -214,8 +254,8 @@ export default function TaskDetail() {
                 {lastRejected.reviewNote && <p className="mt-1 whitespace-pre-wrap break-words">{lastRejected.reviewNote}</p>}
               </div>
             )}
-            <ItemList taskId={task.id} items={task.draft} onRemove={removeFrom('proof')} busyId={busyId} />
-            <ItemAdder onAdd={addTo('proof')} disabled={task.draft.length >= 20} hint={task.draft.length >= 20 ? 'You can add up to 20 items.' : ''} />
+            <ItemList taskId={task.id} items={task.draft} onRemove={removeFrom('proof')} onEdit={editIn('proof')} busyId={busyId} />
+            <ItemAdder onAdd={saveTo('proof')} disabled={task.draft.length >= 20} hint={task.draft.length >= 20 ? 'You can add up to 20 items.' : ''} />
             <div>
               <label htmlFor="proof-note" className="mb-1.5 block text-sm font-semibold">Note for the reviewer</label>
               <textarea id="proof-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} placeholder="Optional" className="field resize-y" />
@@ -224,7 +264,7 @@ export default function TaskDetail() {
         )}
 
         {mine && task.status === 'submitted' && (
-          <p className="rounded-2xl border border-line bg-surface px-6 py-4 text-sm text-muted shadow-card">Your proof is with a reviewer. You will get a notification when they decide.</p>
+          <p className="rounded-2xl border border-line bg-surface px-6 py-4 text-sm text-muted shadow-card">Your proof is under review. You can edit it until a reviewer decides. Changes save directly to your submission.</p>
         )}
 
         {canReview && (
@@ -270,6 +310,25 @@ export default function TaskDetail() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" onClick={closeEdit} className="btn-line">Cancel</button>
               <button type="submit" disabled={busy} className="btn-solid">{busy ? 'Saving…' : 'Save'}</button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {editingItem && (
+        <Dialog title={editingItem.item.kind === 'file' ? 'Replace file' : 'Edit item'} description={editingItem.item.kind === 'file' ? editingItem.item.fileName : undefined} onClose={closeItem}>
+          <ItemAdder item={editingItem.item} onAdd={saveTo(editingItem.role, editingItem.submissionId, editingItem.item)} />
+        </Dialog>
+      )}
+
+      {editingNote && (
+        <Dialog title="Note for the reviewer" onClose={closeNote}>
+          <form className="space-y-4" onSubmit={saveNote}>
+            <textarea value={editingNote.note} onChange={(e) => setEditingNote({ ...editingNote, note: e.target.value })} rows={3} maxLength={1000} aria-label="Note for the reviewer" className="field resize-y" />
+            {editError && <p role="alert" className="text-sm text-red-600">{editError}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" className="btn-line" onClick={closeNote}>Cancel</button>
+              <button type="submit" className="btn-solid" disabled={busy}>{busy ? 'Saving…' : 'Save note'}</button>
             </div>
           </form>
         </Dialog>
