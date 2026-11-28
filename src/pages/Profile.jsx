@@ -9,12 +9,11 @@ import DatePicker from '../components/DatePicker.jsx';
 import ProfileProgress, { checklist } from '../components/ProfileProgress.jsx';
 import Select from '../components/Select.jsx';
 import { COUNTRIES, INDIAN_STATES, lookupPincode } from '../lib/places.js';
+import { BLOOD_GROUPS, GENDERS, todayYmd, validateProfile } from '../lib/profileRules.js';
 import { getProfile, removePhoto, resizeImage, saveProfile, uploadPhoto } from '../lib/profileApi.js';
 import { useToast } from '../components/Toast.jsx';
 import { useSession } from '../lib/session.jsx';
 
-const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const ADDRESS_FIELDS = [
   ['line1', 'Address line 1', 'sm:col-span-2'],
   ['line2', 'Address line 2', 'sm:col-span-2'],
@@ -24,28 +23,17 @@ const ADDRESS_FIELDS = [
   ['country', 'Country', ''],
 ];
 
-const phoneRe = /^(\+91[\s-]?)?[6-9]\d{9}$/;
 const sameAddress = (a, b) => ['line1', 'line2', 'city', 'state', 'pincode', 'country'].every((k) => (a[k] || '').trim() === (b[k] || '').trim());
 const isEmptyAddress = (a) => ['line1', 'line2', 'city', 'state', 'pincode'].every((k) => !(a[k] || '').trim());
-const today = () => new Date().toISOString().slice(0, 10);
 
-function validate(f, extra) {
-  const e = {};
-  if (f.phone.trim() && !phoneRe.test(f.phone.trim())) e.phone = 'Enter a 10-digit mobile number.';
-  if (f.dateOfBirth && f.dateOfBirth > today()) e.dateOfBirth = 'Date of birth cannot be in the future.';
-  if (f.currentAddress.pincode.trim() && !/^\d{6}$/.test(f.currentAddress.pincode.trim())) e.currentPincode = 'Pincode is 6 digits.';
-  if (!extra.same && f.permanentAddress.pincode.trim() && !/^\d{6}$/.test(f.permanentAddress.pincode.trim())) e.permanentPincode = 'Pincode is 6 digits.';
-  if (extra.editPan && f.pan.trim() && !/^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(f.pan.trim())) e.pan = 'PAN looks like ABCDE1234F.';
-  if (f.bankIfsc.trim() && !/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(f.bankIfsc.trim())) e.bankIfsc = 'IFSC looks like HDFC0001234.';
-  if (extra.editAccount && f.bankAccountNumber.trim() && !/^\d{9,18}$/.test(f.bankAccountNumber.trim())) e.bankAccountNumber = 'Account number is 9 to 18 digits.';
-  return e;
-}
-
-function Card({ title, children }) {
+function Card({ title, error, children }) {
   return (
     <section className="rounded-2xl border border-line bg-surface shadow-card">
       <h2 className="border-b border-line px-6 py-4 text-base sm:px-8">{title}</h2>
-      <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">{children}</div>
+      <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
+        {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600 sm:col-span-2">{error}</p>}
+        {children}
+      </div>
     </section>
   );
 }
@@ -92,13 +80,14 @@ function AddressFields({ prefix, value, onChange, errors }) {
   const [lookup, setLookup] = useState(''); // '', 'busy' or 'missing'
   const ctl = useRef(null);
   useEffect(() => () => ctl.current?.abort(), []);
+  const isIndia = value.country === 'India';
 
   // Typing a full 6-digit Indian pincode fills in the city and state.
   function onPincode(raw) {
-    const pin = raw.replace(/\D/g, '').slice(0, 6);
+    const pin = isIndia ? raw.replace(/\D/g, '').slice(0, 6) : raw.replace(/[^A-Za-z0-9 -]/g, '').slice(0, 10);
     onChange('pincode', pin);
     ctl.current?.abort();
-    if (pin.length !== 6 || value.country !== 'India') { setLookup(''); return; }
+    if (pin.length !== 6 || !isIndia) { setLookup(''); return; }
     const c = new AbortController();
     ctl.current = c;
     setLookup('busy');
@@ -111,45 +100,45 @@ function AddressFields({ prefix, value, onChange, errors }) {
     });
   }
 
+  const LIMITS = { line1: 120, line2: 120, city: 60, state: 60 };
   return ADDRESS_FIELDS.map(([key, label, span]) => {
     const id = `${prefix}-${key}`;
-    const isIndia = value.country === 'India';
+    const err = errors[`${prefix}.${key}`];
     let control;
     if (key === 'country') {
       control = (
         <Select
-          id={id} value={value.country} placeholder="Select country"
-          onChange={(v) => { onChange('country', v); if ((v === 'India') !== isIndia) onChange('state', ''); }}
+          id={id} value={value.country} placeholder="Select country" invalid={!!err}
+          onChange={(v) => { onChange('country', v); if ((v === 'India') !== isIndia) { onChange('state', ''); onChange('pincode', ''); } }}
           options={withCurrent(COUNTRIES, value.country).map((c) => ({ value: c, label: c }))}
         />
       );
     } else if (key === 'state' && isIndia) {
       control = (
         <Select
-          id={id} value={value.state} placeholder="Select state" clearLabel="Not specified" onChange={(v) => onChange('state', v)}
+          id={id} value={value.state} placeholder="Select state" clearLabel="Not specified" invalid={!!err} onChange={(v) => onChange('state', v)}
           options={withCurrent(INDIAN_STATES, value.state).map((st) => ({ value: st, label: st }))}
         />
       );
     } else if (key === 'pincode') {
       control = (
         <input
-          id={id} value={value.pincode} onChange={(e) => onPincode(e.target.value)} autoComplete="postal-code" inputMode="numeric" maxLength={6} placeholder="6-digit pincode"
-          className={`field ${errors[`${prefix}Pincode`] ? 'field-error' : ''}`}
+          id={id} value={value.pincode} onChange={(e) => onPincode(e.target.value)} autoComplete="postal-code" inputMode={isIndia ? 'numeric' : 'text'}
+          maxLength={isIndia ? 6 : 10} placeholder={isIndia ? '6-digit pincode' : 'Postal code'} aria-invalid={!!err} className={`field ${err ? 'field-error' : ''}`}
         />
       );
     } else {
       control = (
         <input
-          id={id} value={value[key]} onChange={(e) => onChange(key, e.target.value)} autoComplete="off"
-          inputMode={key === 'pincode' ? 'numeric' : undefined} maxLength={key === 'pincode' ? 6 : undefined}
-          className={`field ${key === 'pincode' && errors[`${prefix}Pincode`] ? 'field-error' : ''}`}
+          id={id} value={value[key]} onChange={(e) => onChange(key, e.target.value)} autoComplete="off" maxLength={LIMITS[key]}
+          aria-invalid={!!err} className={`field ${err ? 'field-error' : ''}`}
         />
       );
     }
     return (
-      <Field key={key} id={id} label={label} className={span} error={key === 'pincode' ? errors[`${prefix}Pincode`] : undefined}>
+      <Field key={key} id={id} label={label} className={span} error={err}>
         {control}
-        {key === 'pincode' && !errors[`${prefix}Pincode`] && lookup && (
+        {key === 'pincode' && !err && lookup && (
           <p className="mt-1.5 text-[13px] text-muted">{lookup === 'busy' ? 'Finding city and state…' : 'Could not find this pincode. Enter city and state yourself.'}</p>
         )}
       </Field>
@@ -167,6 +156,7 @@ export default function Profile() {
   const [editPan, setEditPan] = useState(false);
   const [editAccount, setEditAccount] = useState(false);
   const [errors, setErrors] = useState({});
+  const [attempted, setAttempted] = useState(false); // after the first Save click, mistakes are shown as they are fixed
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -195,21 +185,36 @@ export default function Profile() {
     setSnapshot(JSON.stringify({ form: next, same: nextSame }));
     setEditPan(false);
     setEditAccount(false);
+    setErrors({});
+    setAttempted(false);
   }
 
   useEffect(() => {
     getProfile().then(apply).catch((err) => setLoadError(err.message));
   }, []);
 
-  const set = (key) => (e) => { setForm((f) => ({ ...f, [key]: e.target.value })); setErrors((x) => ({ ...x, [key]: undefined })); };
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const setValue = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
   const setAddr = (which) => (key, value) => { setForm((f) => ({ ...f, [which]: { ...f[which], [key]: value } })); };
-  const cls = (key) => `field ${errors[key] ? 'field-error' : ''}`;
+  const cls = (key, extra = '') => `field ${extra} ${errors[key] ? 'field-error' : ''}`;
+
+  const check = useCallback((f) => validateProfile(f, { same, savedPan: !!meta?.pan.saved, savedAccount: !!meta?.accountSaved, editPan, editAccount }), [same, meta, editPan, editAccount]);
+  useEffect(() => { if (attempted && form) setErrors(check(form)); }, [attempted, form, check]);
 
   async function onSave(e) {
     e.preventDefault();
-    const found = validate(form, { same, editPan, editAccount });
+    const found = check(form);
     setErrors(found);
-    if (Object.keys(found).length) return;
+    setAttempted(true);
+    if (Object.keys(found).length) {
+      // Take the person to the first thing that needs fixing.
+      setTimeout(() => {
+        const first = document.querySelector('#profile-form [aria-invalid="true"]') || document.querySelector('#profile-form [role="alert"]');
+        first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        first?.focus?.({ preventScroll: true });
+      }, 0);
+      return;
+    }
     setBusy(true);
     try {
       const body = {
@@ -283,6 +288,7 @@ export default function Profile() {
     setEditPan(false);
     setEditAccount(false);
     setErrors({});
+    setAttempted(false);
   }
 
   const memberSince = meta ? new Date(meta.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -328,52 +334,64 @@ export default function Profile() {
           </section>
 
           <form id="profile-form" onSubmit={onSave} noValidate className="space-y-6">
-            <Card title="Personal">
+            <Card title="Personal" error={errors['card.personal']}>
               <Field id="pf-name" label="Full name"><input id="pf-name" readOnly value={user?.name || ''} className="field bg-soft/60" /></Field>
               <Field id="pf-email" label="Email"><input id="pf-email" readOnly value={meta.email} className="field bg-soft/60" /></Field>
               <Field id="pf-dob" label="Date of birth" error={errors.dateOfBirth}>
-                <DatePicker id="pf-dob" value={form.dateOfBirth} max={today()} placeholder="Select date" invalid={!!errors.dateOfBirth} onChange={(v) => { setForm((f) => ({ ...f, dateOfBirth: v })); setErrors((x) => ({ ...x, dateOfBirth: undefined })); }} />
+                <DatePicker id="pf-dob" value={form.dateOfBirth} max={todayYmd()} placeholder="Select date" invalid={!!errors.dateOfBirth} onChange={setValue('dateOfBirth')} />
               </Field>
               <Field id="pf-phone" label="Mobile number" error={errors.phone}>
-                <input id="pf-phone" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" placeholder="9876543210" className={cls('phone')} />
+                <input
+                  id="pf-phone" type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value.replace(/[^\d+\s-]/g, '') }))}
+                  autoComplete="tel" placeholder="9876543210" maxLength={14} aria-invalid={!!errors.phone} className={cls('phone')}
+                />
               </Field>
-              <Field id="pf-gender" label="Gender">
-                <Select id="pf-gender" value={form.gender} onChange={(v) => { setForm((f) => ({ ...f, gender: v })); }} clearLabel="Not specified" options={GENDERS.map((g) => ({ value: g, label: g }))} />
+              <Field id="pf-gender" label="Gender" error={errors.gender}>
+                <Select id="pf-gender" value={form.gender} invalid={!!errors.gender} onChange={setValue('gender')} placeholder="Select gender" clearLabel="Not specified" options={GENDERS.map((g) => ({ value: g, label: g }))} />
               </Field>
-              <Field id="pf-blood" label="Blood group">
-                <Select id="pf-blood" value={form.bloodGroup} onChange={(v) => { setForm((f) => ({ ...f, bloodGroup: v })); }} clearLabel="Not specified" options={BLOOD_GROUPS.map((g) => ({ value: g, label: g }))} />
+              <Field id="pf-blood" label="Blood group" error={errors.bloodGroup}>
+                <Select id="pf-blood" value={form.bloodGroup} invalid={!!errors.bloodGroup} onChange={setValue('bloodGroup')} placeholder="Select blood group" clearLabel="Not specified" options={BLOOD_GROUPS.map((g) => ({ value: g, label: g }))} />
               </Field>
             </Card>
 
-            <Card title="Current address">
+            <Card title="Current address" error={errors['card.current']}>
               <AddressFields prefix="current" value={form.currentAddress} onChange={setAddr('currentAddress')} errors={errors} />
             </Card>
 
-            <Card title="Permanent address">
+            <Card title="Permanent address" error={errors['card.permanent']}>
               <Checkbox checked={same} onChange={(e) => { setSame(e.target.checked); }} className="sm:col-span-2">Same as current address</Checkbox>
               {!same && <AddressFields prefix="permanent" value={form.permanentAddress} onChange={setAddr('permanentAddress')} errors={errors} />}
             </Card>
 
-            <Card title="PAN and bank details">
+            <Card title="PAN and bank details" error={errors['card.bank']}>
               <SecretField
                 id="pf-pan" label="PAN number" saved={meta.pan.saved} last4={meta.pan.last4} editing={editPan} placeholder="ABCDE1234F" upper
                 value={form.pan} error={errors.pan}
-                onChange={(v) => { setForm((f) => ({ ...f, pan: v })); setErrors((x) => ({ ...x, pan: undefined })); }}
-                onEdit={() => setEditPan(true)} onCancel={() => { setEditPan(false); setForm((f) => ({ ...f, pan: '' })); setErrors((x) => ({ ...x, pan: undefined })); }}
+                onChange={(v) => setForm((f) => ({ ...f, pan: v.replace(/[^A-Za-z0-9]/g, '').slice(0, 10) }))}
+                onEdit={() => setEditPan(true)} onCancel={() => { setEditPan(false); setForm((f) => ({ ...f, pan: '' })); }}
               />
               <div className="hidden sm:block" />
-              <Field id="pf-bank-holder" label="Account holder name"><input id="pf-bank-holder" value={form.bankHolder} onChange={set('bankHolder')} autoComplete="off" className="field" /></Field>
-              <Field id="pf-bank-name" label="Bank name"><input id="pf-bank-name" value={form.bankName} onChange={set('bankName')} autoComplete="off" className="field" /></Field>
+              <Field id="pf-bank-holder" label="Account holder name" error={errors.bankHolder}>
+                <input id="pf-bank-holder" value={form.bankHolder} onChange={set('bankHolder')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankHolder} className={cls('bankHolder')} />
+              </Field>
+              <Field id="pf-bank-name" label="Bank name" error={errors.bankName}>
+                <input id="pf-bank-name" value={form.bankName} onChange={set('bankName')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankName} className={cls('bankName')} />
+              </Field>
               <SecretField
                 id="pf-bank-account" label="Account number" saved={meta.accountSaved} last4={meta.accountLast4} editing={editAccount} placeholder="Account number"
                 value={form.bankAccountNumber} error={errors.bankAccountNumber}
-                onChange={(v) => { setForm((f) => ({ ...f, bankAccountNumber: v.replace(/\D/g, '') })); setErrors((x) => ({ ...x, bankAccountNumber: undefined })); }}
-                onEdit={() => setEditAccount(true)} onCancel={() => { setEditAccount(false); setForm((f) => ({ ...f, bankAccountNumber: '' })); setErrors((x) => ({ ...x, bankAccountNumber: undefined })); }}
+                onChange={(v) => setForm((f) => ({ ...f, bankAccountNumber: v.replace(/\D/g, '').slice(0, 18) }))}
+                onEdit={() => setEditAccount(true)} onCancel={() => { setEditAccount(false); setForm((f) => ({ ...f, bankAccountNumber: '' })); }}
               />
               <Field id="pf-bank-ifsc" label="IFSC code" error={errors.bankIfsc}>
-                <input id="pf-bank-ifsc" value={form.bankIfsc} onChange={(e) => { setForm((f) => ({ ...f, bankIfsc: e.target.value.toUpperCase() })); setErrors((x) => ({ ...x, bankIfsc: undefined })); }} autoComplete="off" placeholder="HDFC0001234" className={`${cls('bankIfsc')} font-mono`} />
+                <input
+                  id="pf-bank-ifsc" value={form.bankIfsc} onChange={(e) => setForm((f) => ({ ...f, bankIfsc: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 11) }))}
+                  autoComplete="off" placeholder="HDFC0001234" maxLength={11} aria-invalid={!!errors.bankIfsc} className={cls('bankIfsc', 'font-mono')}
+                />
               </Field>
-              <Field id="pf-bank-branch" label="Branch"><input id="pf-bank-branch" value={form.bankBranch} onChange={set('bankBranch')} autoComplete="off" className="field" /></Field>
+              <Field id="pf-bank-branch" label="Branch" error={errors.bankBranch}>
+                <input id="pf-bank-branch" value={form.bankBranch} onChange={set('bankBranch')} autoComplete="off" maxLength={80} aria-invalid={!!errors.bankBranch} className={cls('bankBranch')} />
+              </Field>
             </Card>
           </form>
         </div>

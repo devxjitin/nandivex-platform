@@ -66,14 +66,30 @@ const pattern = (re: RegExp, message: string, max = 60) =>
   z.string().trim().max(max).refine((v) => v === '' || re.test(v), message).transform((v) => v || null);
 const phone = pattern(/^(\+91[\s-]?)?[6-9]\d{9}$/, 'Enter a 10-digit mobile number.', 20);
 
+const PLACE_RE = /^[\p{L}][\p{L} .'()-]{1,59}$/u;
+const INDIAN_PINCODE = /^[1-9]\d{5}$/;
+const OTHER_POSTCODE = /^[A-Za-z0-9][A-Za-z0-9 -]{2,9}$/;
+
 const address = z
   .object({
     line1: text(120),
     line2: text(120),
     city: text(60),
     state: text(60),
-    pincode: pattern(/^\d{6}$/, 'Pincode must be 6 digits.', 10),
+    pincode: text(10),
     country: text(60),
+  })
+  .superRefine((a, ctx) => {
+    const bad = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+    const india = a.country === 'India';
+    if (a.line1 && (a.line1.length < 3 || !/[\p{L}\p{N}]/u.test(a.line1))) bad('line1', 'Address line 1 is too short.');
+    if (a.line2 && !/[\p{L}\p{N}]/u.test(a.line2)) bad('line2', 'Address line 2 needs letters or numbers.');
+    if (a.city && !PLACE_RE.test(a.city)) bad('city', 'City can only have letters and spaces.');
+    if (a.state && !PLACE_RE.test(a.state)) bad('state', 'State can only have letters and spaces.');
+    if (a.country && !PLACE_RE.test(a.country)) bad('country', 'Enter a valid country.');
+    if (a.pincode && !(india ? INDIAN_PINCODE : OTHER_POSTCODE).test(a.pincode)) {
+      bad('pincode', india ? 'Pincode must be 6 digits and cannot start with 0.' : 'Enter a valid postal code.');
+    }
   })
   .transform((a): Address => ({
     line1: a.line1 ?? '',
@@ -112,12 +128,31 @@ const updateBody = z.object({
   permanentAddress: address,
   // Only sent when the person types a new value; empty keeps what is saved.
   pan: z.string().trim().toUpperCase().refine((v) => v === '' || /^[A-Z]{5}\d{4}[A-Z]$/.test(v), 'PAN looks like ABCDE1234F.').optional(),
-  bankHolder: text(80),
-  bankName: text(80),
+  bankHolder: pattern(/^[\p{L}][\p{L} .'-]{1,79}$/u, 'Account holder name can only have letters and spaces.', 80),
+  bankName: pattern(/^[\p{L}\p{N}][\p{L}\p{N} &.'()-]{1,79}$/u, 'Enter a valid bank name.', 80),
   bankIfsc: z.string().trim().toUpperCase().refine((v) => v === '' || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), 'IFSC looks like HDFC0001234.').transform((v) => v || null),
-  bankBranch: text(80),
+  bankBranch: pattern(/^[\p{L}\p{N}][\p{L}\p{N} &.,'()/-]{1,79}$/u, 'Enter a valid branch name.', 80),
   bankAccountNumber: z.string().trim().refine((v) => v === '' || /^\d{9,18}$/.test(v), 'Account number is 9 to 18 digits.').optional(),
 });
+
+const filled = (v: unknown) => v !== null && v !== undefined && v !== '';
+
+/** A card is either left completely empty or filled in completely. Returns a message for the first card that is half done. */
+function incompleteCard(b: z.infer<typeof updateBody>, saved: Profile | null): string | null {
+  const half = (title: string) => `Fill in every field in ${title}, or leave all of them empty.`;
+  if ([b.dateOfBirth, b.gender, b.bloodGroup, b.phone].some(filled) && ![b.dateOfBirth, b.gender, b.bloodGroup, b.phone].every(filled)) {
+    return half('Personal');
+  }
+  // Address line 2 is the only optional field in an address.
+  const addressHalf = (a: Address) =>
+    [a.line1, a.line2, a.city, a.state, a.pincode].some(filled) && ![a.line1, a.city, a.state, a.pincode, a.country].every(filled);
+  if (addressHalf(b.currentAddress)) return half('Current address');
+  if (addressHalf(b.permanentAddress)) return half('Permanent address');
+  // A saved PAN or account number counts, because an empty value here means "keep what is saved".
+  const bank = [b.pan || saved?.panEnc, b.bankHolder, b.bankName, b.bankIfsc, b.bankBranch, b.bankAccountNumber || saved?.bankAccountEnc];
+  if (bank.some(filled) && !bank.every(filled)) return half('PAN and bank details');
+  return null;
+}
 
 profileRouter.put('/', async (req, res) => {
   const parsed = updateBody.safeParse(req.body);
@@ -125,6 +160,9 @@ profileRouter.put('/', async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the details and try again.' });
   }
   const b = parsed.data;
+  const existing = await prisma.profile.findUnique({ where: { userId: req.user!.id } });
+  const half = incompleteCard(b, existing);
+  if (half) return res.status(400).json({ error: half });
   const data = {
     dateOfBirth: b.dateOfBirth,
     gender: b.gender,
