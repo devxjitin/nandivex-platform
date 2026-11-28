@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Avatar from '../Avatar.jsx';
 import NotificationBell from '../NotificationBell.jsx';
 import { homeFor, isManager, useSession } from '../../lib/session.jsx';
@@ -26,11 +26,11 @@ function PeopleIcon() {
     </svg>
   );
 }
-function BriefcaseIcon() {
+function GlobeIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}>
-      <rect x="3" y="7" width="18" height="13" rx="2.5" />
-      <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" />
     </svg>
   );
 }
@@ -76,7 +76,10 @@ function LogoutIcon() {
 const CRUMBS = [
   { match: (p) => p.startsWith('/admin/employees/new'), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Add employee' }] },
   { match: (p) => /^\/admin\/employees\/[^/]+/.test(p), trail: [{ label: 'Employees', to: '/admin' }, { label: 'Details' }] },
-  { match: (p) => p.startsWith('/admin/careers'), trail: [{ label: 'Careers' }] },
+  { match: (p) => p === '/admin/careers/new', trail: [{ label: 'Website' }, { label: 'Careers', to: '/admin/careers' }, { label: 'Add role' }] },
+  { match: (p) => /^\/admin\/careers\/[^/]+/.test(p), trail: [{ label: 'Website' }, { label: 'Careers', to: '/admin/careers' }, { label: 'Edit role' }] },
+  { match: (p) => p.startsWith('/admin/careers'), trail: [{ label: 'Website' }, { label: 'Careers' }] },
+  { match: (p) => p.startsWith('/admin/contact'), trail: [{ label: 'Website' }, { label: 'Contact' }] },
   { match: (p) => p.startsWith('/admin'), trail: [{ label: 'Employees' }] },
   { match: (p) => p.startsWith('/profile'), trail: [{ label: 'Profile' }] },
   { match: (p) => p.startsWith('/home'), trail: [{ label: 'Home' }] },
@@ -85,17 +88,22 @@ const CRUMBS = [
 export default function AdminLayout({ children }) {
   const { user, signOut } = useSession();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const footRef = useRef(null);
+  const careersActive = pathname.startsWith('/admin/careers');
+  const contactActive = pathname.startsWith('/admin/contact');
+  const websiteActive = careersActive || contactActive;
+  const [siteOpen, setSiteOpen] = useState(websiteActive);
+  useEffect(() => { if (websiteActive) setSiteOpen(true); }, [websiteActive]);
 
   const manager = isManager(user);
   const nav = [
     { to: '/home', label: 'Home', icon: <HomeIcon />, active: pathname.startsWith('/home') },
     ...(manager ? [
-      { to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') && !pathname.startsWith('/admin/careers') },
-      { to: '/admin/careers', label: 'Careers', icon: <BriefcaseIcon />, active: pathname.startsWith('/admin/careers') },
+      { to: '/admin', label: 'Employees', icon: <PeopleIcon />, active: pathname.startsWith('/admin') && !websiteActive },
     ] : []),
   ];
   const trail = (CRUMBS.find((c) => c.match(pathname)) || CRUMBS[0]).trail;
@@ -142,6 +150,22 @@ export default function AdminLayout({ children }) {
               <span>{item.label}</span>
             </Link>
           ))}
+          {manager && (
+            <>
+              <button type="button" className={`shell-item shell-group${websiteActive ? ' has-active' : ''}`} aria-expanded={siteOpen} title="Website"
+                onClick={() => { if (collapsed) navigate('/admin/careers'); else setSiteOpen((v) => !v); }}>
+                <span className="shell-ico"><GlobeIcon /></span>
+                <span>Website</span>
+                <span className={`shell-gcaret${siteOpen ? ' open' : ''}`}><ChevronIcon /></span>
+              </button>
+              {siteOpen && (
+                <div className="shell-sub">
+                  <Link to="/admin/careers" className={`shell-subitem${careersActive ? ' active' : ''}`} aria-current={careersActive ? 'page' : undefined}>Careers</Link>
+                  <Link to="/admin/contact" className={`shell-subitem${contactActive ? ' active' : ''}`} aria-current={contactActive ? 'page' : undefined}>Contact</Link>
+                </div>
+              )}
+            </>
+          )}
         </nav>
 
         <div className="shell-foot" ref={footRef}>

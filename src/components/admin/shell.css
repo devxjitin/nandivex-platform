@@ -10,6 +10,14 @@
 .shell-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; font-size: .9rem; font-weight: 500; color: rgb(var(--c-ink) / .82); transition: background-color .15s ease, color .15s ease; }
 .shell-item:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink)); }
 .shell-item.active { background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-weight: 600; }
+.shell-group { width: 100%; text-align: left; cursor: pointer; }
+.shell-group.has-active { color: rgb(var(--c-ink)); font-weight: 600; }
+.shell-gcaret { margin-left: auto; display: grid; place-items: center; color: rgb(var(--c-muted)); transition: transform .2s ease; }
+.shell-gcaret.open { transform: rotate(90deg); }
+.shell-sub { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 3px 22px; padding-left: 12px; border-left: 1px solid rgb(var(--c-line)); }
+.shell-subitem { padding: 7px 12px; border-radius: 10px; font-size: .88rem; font-weight: 500; color: rgb(var(--c-ink) / .78); transition: background-color .15s ease, color .15s ease; }
+.shell-subitem:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink)); }
+.shell-subitem.active { background: rgb(var(--c-tint)); color: rgb(var(--c-accent-dark)); font-weight: 600; }
 .shell-ico { display: grid; flex: none; place-items: center; width: 20px; height: 20px; }
 .shell-item svg { color: rgb(var(--c-muted)); }
 .shell-item.active svg { color: rgb(var(--c-accent-dark)); }
@@ -80,6 +88,7 @@ a.shell-menu-item:hover { background: rgb(var(--c-soft)); color: rgb(var(--c-ink
   .shell-chip { transition: padding .28s cubic-bezier(.4, 0, .2, 1), gap .28s cubic-bezier(.4, 0, .2, 1), background-color .12s ease, border-color .12s ease; }
 
   .shell-collapsed .shell-item > span:not(.shell-ico), .shell-collapsed .shell-meta, .shell-collapsed .shell-caret, .shell-collapsed .shell-copy { max-width: 0; opacity: 0; transition: opacity .1s ease, max-width .28s cubic-bezier(.4, 0, .2, 1); }
+  .shell-collapsed .shell-sub { display: none; }
   .shell-collapsed .shell-label { opacity: 0; max-height: 0; padding-block: 0; }
   .shell-collapsed .shell-head { padding-inline: 7px; }
   .shell-collapsed .shell-logo { display: none; }

@@ -11,6 +11,8 @@ import { APP_ENABLED } from './lib/flags.js';
 
 const Employees = APP_ENABLED ? lazy(() => import('./pages/admin/Employees.jsx')) : null;
 const Careers = APP_ENABLED ? lazy(() => import('./pages/admin/Careers.jsx')) : null;
+const ContactMessages = APP_ENABLED ? lazy(() => import('./pages/admin/ContactMessages.jsx')) : null;
+const CareerRole = APP_ENABLED ? lazy(() => import('./pages/admin/CareerRole.jsx')) : null;
 const AddEmployee = APP_ENABLED ? lazy(() => import('./pages/admin/AddEmployee.jsx')) : null;
 const ChangePassword = APP_ENABLED ? lazy(() => import('./pages/ChangePassword.jsx')) : null;
 const ForgotPassword = APP_ENABLED ? lazy(() => import('./pages/ForgotPassword.jsx')) : null;
@@ -35,6 +37,9 @@ function App() {
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/admin" element={<RequireAuth manager><Employees /></RequireAuth>} />
               <Route path="/admin/careers" element={<RequireAuth manager><Careers /></RequireAuth>} />
+              <Route path="/admin/contact" element={<RequireAuth manager><ContactMessages /></RequireAuth>} />
+              <Route path="/admin/careers/new" element={<RequireAuth manager><CareerRole /></RequireAuth>} />
+              <Route path="/admin/careers/:id" element={<RequireAuth manager><CareerRole /></RequireAuth>} />
               <Route path="/admin/employees/new" element={<RequireAuth manager><AddEmployee /></RequireAuth>} />
               <Route path="/admin/employees/:id" element={<RequireAuth manager><EmployeeProfile /></RequireAuth>} />
             </>
