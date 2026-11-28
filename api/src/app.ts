@@ -11,6 +11,7 @@ import { employeesRouter } from './routes/employees';
 import { notificationsRouter } from './routes/notifications';
 import { profileRouter } from './routes/profile';
 import { rolesRouter } from './routes/roles';
+import { tasksRouter } from './routes/tasks';
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp() {
   app.use('/roles', rolesRouter);
   app.use('/careers', careersRouter);
   app.use('/contact-messages', contactRouter);
+  app.use('/tasks', tasksRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found.' }));
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

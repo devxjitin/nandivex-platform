@@ -40,6 +40,9 @@ model User {
   profile            Profile?
   photo              ProfilePhoto?
   notifications      Notification[]
+  tasksAssigned      Task[]               @relation("TaskAssignee")
+  tasksCreated       Task[]               @relation("TaskCreator")
+  tasksReviewed      TaskSubmission[]     @relation("TaskReviewer")
 }
 
 // Personal and payroll details each person keeps about themselves. PAN and the bank account number are
@@ -193,4 +196,98 @@ model ContactMessage {
   createdAt DateTime      @default(now())
 
   @@index([status, createdAt])
+}
+
+// PENDING: waiting for the assignee's proof. SUBMITTED: proof is waiting for a manager. REJECTED: the manager sent it
+// back, the assignee must add proof again. APPROVED: done.
+enum TaskStatus {
+  PENDING
+  SUBMITTED
+  REJECTED
+  APPROVED
+}
+
+enum TaskItemKind {
+  TEXT
+  LINK
+  FILE
+}
+
+// BRIEF items explain the task (added by managers). PROOF items show it was done (added by the assignee).
+enum TaskItemRole {
+  BRIEF
+  PROOF
+}
+
+enum TaskDecision {
+  APPROVED
+  REJECTED
+}
+
+// A task a Founder, Co-Founder or Admin gives to someone. The explanation and the proof are both lists of items:
+// text, links, or files (images, audio, video, documents).
+model Task {
+  id          String           @id @default(uuid())
+  title       String
+  description String?
+  assigneeId  String
+  assignee    User             @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?            @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  dueDate     DateTime?        @db.Date
+  status      TaskStatus       @default(PENDING)
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       TaskItem[]
+  submissions TaskSubmission[]
+
+  @@index([assigneeId, status])
+  @@index([status, createdAt])
+}
+
+// One time the assignee handed in proof, and what the reviewing manager decided about it.
+model TaskSubmission {
+  id           String        @id @default(uuid())
+  taskId       String
+  task         Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attempt      Int
+  note         String?
+  submittedAt  DateTime      @default(now())
+  decision     TaskDecision?
+  reviewNote   String?
+  reviewedById String?
+  reviewedBy   User?         @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  items        TaskItem[]
+
+  @@unique([taskId, attempt])
+}
+
+// PROOF items with no submission yet are the assignee's draft.
+model TaskItem {
+  id           String          @id @default(uuid())
+  taskId       String
+  task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  role         TaskItemRole
+  submissionId String?
+  submission   TaskSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  kind         TaskItemKind
+  text         String?
+  url          String?
+  fileName     String?
+  contentType  String?
+  size         Int?
+  createdAt    DateTime        @default(now())
+  file         TaskFile?
+
+  @@index([taskId, role])
+  @@index([submissionId])
+}
+
+// The bytes of an uploaded file, kept apart so lists of items never load them.
+model TaskFile {
+  itemId String   @id
+  item   TaskItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  data   Bytes
 }

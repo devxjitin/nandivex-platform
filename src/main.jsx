@@ -33,6 +33,9 @@ const ResetPassword = APP_ENABLED ? lazy(() => import('./pages/ResetPassword.jsx
 const EmployeeProfile = APP_ENABLED ? lazy(() => import('./pages/admin/EmployeeProfile.jsx')) : null;
 const Profile = APP_ENABLED ? lazy(() => import('./pages/Profile.jsx')) : null;
 const Home = APP_ENABLED ? lazy(() => import('./pages/Home.jsx')) : null;
+const Tasks = APP_ENABLED ? lazy(() => import('./pages/Tasks.jsx')) : null;
+const TaskNew = APP_ENABLED ? lazy(() => import('./pages/TaskNew.jsx')) : null;
+const TaskDetail = APP_ENABLED ? lazy(() => import('./pages/TaskDetail.jsx')) : null;
 
 function App() {
   return (
@@ -48,6 +51,9 @@ function App() {
               <Route path="/change-password" element={<RequireAuth><ChangePassword /></RequireAuth>} />
               <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+              <Route path="/tasks" element={<RequireAuth><Tasks /></RequireAuth>} />
+              <Route path="/tasks/new" element={<RequireAuth manager><TaskNew /></RequireAuth>} />
+              <Route path="/tasks/:id" element={<RequireAuth><TaskDetail /></RequireAuth>} />
               <Route path="/admin" element={<RequireAuth manager><Employees /></RequireAuth>} />
               <Route path="/admin/careers" element={<RequireAuth manager><Careers /></RequireAuth>} />
               <Route path="/admin/contact" element={<RequireAuth manager><ContactMessages /></RequireAuth>} />
