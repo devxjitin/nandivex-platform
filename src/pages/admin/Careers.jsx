@@ -4,7 +4,7 @@ import Dialog from '../../components/admin/Dialog.jsx';
 import Select from '../../components/Select.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import CareerInterests from './CareerInterests.jsx';
-import { addCareerRole, deleteCareerRole, getCareers, reorderCareerRoles, saveCareerRole, saveCareerSettings } from '../../lib/careersApi.js';
+import { addCareerRole, deleteCareerRole, getCareers, reorderCareerRoles, saveCareerRole } from '../../lib/careersApi.js';
 import { KINDS, STATUSES, STATUS_LABEL, cleanRole, emptyRole, validateRole } from '../../lib/careerRules.js';
 
 const SITE_CAREERS_URL = 'https://nandivex.com/careers';
@@ -202,60 +202,6 @@ function RoleEditor({ initial, onSave, onClose }) {
   );
 }
 
-/** The message shown on the website while no role is open. */
-function StatusCard({ settings, onSaved }) {
-  const toast = useToast();
-  const [v, setV] = useState(settings);
-  const [errors, setErrors] = useState({});
-  const [busy, setBusy] = useState(false);
-  const dirty = v.statusTitle !== settings.statusTitle || v.statusText !== settings.statusText;
-
-  async function save(e) {
-    e.preventDefault();
-    const found = {};
-    const t = v.statusTitle.trim();
-    const x = v.statusText.trim();
-    if (t.length < 3) found.statusTitle = 'Enter a title of at least 3 characters.';
-    else if (t.length > 120) found.statusTitle = `Keep the title under 120 characters. You have ${t.length}.`;
-    if (x.length < 3) found.statusText = 'Enter a message of at least 3 characters.';
-    else if (x.length > 500) found.statusText = `Keep the message under 500 characters. You have ${x.length}.`;
-    setErrors(found);
-    if (Object.keys(found).length) return;
-    setBusy(true);
-    try {
-      const saved = await saveCareerSettings({ statusTitle: t, statusText: x });
-      onSaved(saved);
-      setV(saved);
-      toast.success('Message saved');
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="rounded-2xl border border-line bg-surface shadow-card">
-      <div className="border-b border-line px-6 py-4 sm:px-8">
-        <h2 className="text-base">When no role is open</h2>
-        <p className="mt-0.5 text-[13px] text-muted">This message is shown at the top of the Careers page while nothing is marked Open.</p>
-      </div>
-      <form onSubmit={save} noValidate className="grid gap-5 p-6 sm:p-8">
-        <Field id="cs-title" label="Title" error={errors.statusTitle}>
-          <input id="cs-title" value={v.statusTitle} onChange={(e) => { setV({ ...v, statusTitle: e.target.value }); setErrors({ ...errors, statusTitle: undefined }); }} maxLength={120} aria-invalid={!!errors.statusTitle} className={cls(errors.statusTitle)} />
-        </Field>
-        <Field id="cs-text" label="Message" error={errors.statusText} hint={`${v.statusText.trim().length}/500`}>
-          <textarea id="cs-text" value={v.statusText} onChange={(e) => { setV({ ...v, statusText: e.target.value }); setErrors({ ...errors, statusText: undefined }); }} maxLength={500} rows={3} aria-invalid={!!errors.statusText} className={`${cls(errors.statusText)} resize-y`} />
-        </Field>
-        <div className="flex items-center justify-end gap-4">
-          {dirty && !busy && <button type="button" onClick={() => { setV(settings); setErrors({}); }} className="text-[13px] font-semibold leading-none text-muted transition hover:text-accent">Discard</button>}
-          <button type="submit" disabled={!dirty || busy} className="btn-solid !px-5 !py-2.5 text-[13px]">{busy ? 'Saving…' : 'Save message'}</button>
-        </div>
-      </form>
-    </section>
-  );
-}
-
 const iconBtn = 'grid h-9 w-9 flex-none place-items-center rounded-full text-muted transition enabled:hover:bg-tint enabled:hover:text-accent disabled:opacity-30';
 
 export default function Careers() {
@@ -334,14 +280,12 @@ export default function Careers() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl">Careers</h1>
-            <p className="mt-1 text-sm text-muted">The roles and the message on the Careers page of nandivex.com. Saved changes show on the website straight away.</p>
+            <p className="mt-1 text-sm text-muted">The roles on the Careers page of nandivex.com. Saved changes show on the website straight away.</p>
           </div>
           <a href={SITE_CAREERS_URL} target="_blank" rel="noreferrer" className="btn-line flex-none"><ExternalIcon /> View on website</a>
         </div>
 
         {loadError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{loadError}</p>}
-
-        {data && <StatusCard settings={data.settings} onSaved={(s) => setData((d) => ({ ...d, settings: s }))} />}
 
         {data && (
           <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
