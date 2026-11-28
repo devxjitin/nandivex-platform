@@ -22,7 +22,6 @@ const createBody = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
   role: roleNameSchema.transform(canonicalRole),
   password: passwordSchema,
-  mustChangePassword: z.boolean().default(true),
 });
 
 employeesRouter.post('/', async (req, res) => {
@@ -30,7 +29,7 @@ employeesRouter.post('/', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Check the details and try again.' });
   }
-  const { name, email, role, password, mustChangePassword } = parsed.data;
+  const { name, email, role, password } = parsed.data;
 
   if (await prisma.user.findUnique({ where: { email } })) {
     return res.status(409).json({ error: 'An account with this email already exists.' });
@@ -40,12 +39,12 @@ employeesRouter.post('/', async (req, res) => {
   const passwordHash = await hashPassword(password);
   const created = await prisma.$transaction(async (tx) => {
     const saved = await tx.role.upsert({ where: { nameKey: roleKey(role) }, update: {}, create: { name: role, nameKey: roleKey(role) } });
-    return tx.user.create({ data: { name, email, role: saved.name, passwordHash, mustChangePassword } });
+    return tx.user.create({ data: { name, email, role: saved.name, passwordHash, mustChangePassword: false } });
   });
 
   let emailSent = true;
   try {
-    await sendLoginEmail({ to: email, name, role: created.role, password, mustChangePassword, reset: false });
+    await sendLoginEmail({ to: email, name, role: created.role, password, mustChangePassword: false, reset: false });
   } catch (err) {
     emailSent = false;
     console.error('Login email failed', err);
@@ -64,12 +63,12 @@ employeesRouter.post('/:id/reset-password', async (req, res) => {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: await hashPassword(password), mustChangePassword: true },
+    data: { passwordHash: await hashPassword(password), mustChangePassword: false },
   });
 
   let emailSent = true;
   try {
-    await sendLoginEmail({ to: user.email, name: user.name, role: user.role, password, mustChangePassword: true, reset: true });
+    await sendLoginEmail({ to: user.email, name: user.name, role: user.role, password, mustChangePassword: false, reset: true });
   } catch (err) {
     emailSent = false;
     console.error('Reset email failed', err);

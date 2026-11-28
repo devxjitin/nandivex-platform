@@ -6,8 +6,8 @@ export async function listEmployees() {
 }
 
 /** Creates the account; the API emails the login details. Returns { employee, emailSent }. */
-export function createEmployee({ name, email, role, password, mustChangePassword }) {
-  return api('/employees', { method: 'POST', body: { name, email, role, password, mustChangePassword } });
+export function createEmployee({ name, email, role, password }) {
+  return api('/employees', { method: 'POST', body: { name, email, role, password } });
 }
 
 /** Sets a new temporary password and emails it. Returns { emailSent }. */

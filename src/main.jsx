@@ -32,7 +32,7 @@ function App() {
             <>
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/change-password" element={<RequireAuth allowMustChange><ChangePassword /></RequireAuth>} />
+              <Route path="/change-password" element={<RequireAuth><ChangePassword /></RequireAuth>} />
               <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
               <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/admin" element={<RequireAuth manager><Employees /></RequireAuth>} />

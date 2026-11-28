@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { homeFor, useSession } from '../lib/session.jsx';
+import { useSession } from '../lib/session.jsx';
 
 export default function ChangePassword() {
   const navigate = useNavigate();
-  const { user, setUser, signOut } = useSession();
+  const { setUser } = useSession();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +28,7 @@ export default function ChangePassword() {
     try {
       const { user: updated } = await api('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
       setUser(updated);
-      navigate(homeFor(updated), { replace: true });
+      navigate('/profile', { replace: true });
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -45,9 +45,7 @@ export default function ChangePassword() {
           <p className="label">Set your password</p>
           <h1 className="mt-3 text-3xl">Choose a new password</h1>
           <p className="mt-2 text-[15px] text-muted">
-            {user?.mustChangePassword
-              ? 'The password you were emailed is temporary. Choose your own to continue.'
-              : 'Pick a new password for your account.'}
+            Pick a new password for your account.
           </p>
 
           <form onSubmit={onSubmit} noValidate className="mt-8 space-y-5">
@@ -68,7 +66,7 @@ export default function ChangePassword() {
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">{error}</p>}
 
             <button type="submit" disabled={busy} className="btn-solid w-full !py-3.5 text-[15px]">{busy ? 'Saving…' : 'Save password'}</button>
-            <button type="button" onClick={signOut} className="w-full text-center text-sm font-semibold text-muted hover:text-accent">Sign out</button>
+            <Link to="/profile" className="block w-full text-center text-sm font-semibold text-muted hover:text-accent">Cancel</Link>
           </form>
         </div>
       </div>

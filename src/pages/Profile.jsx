@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useBlocker } from 'react-router-dom';
+import { Link, useBlocker } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout.jsx';
 import Dialog from '../components/admin/Dialog.jsx';
 import Avatar from '../components/Avatar.jsx';
@@ -338,6 +338,7 @@ export default function Profile() {
                 </button>
                 {user?.photoVersion && !photoBusy && <button type="button" onClick={onRemovePhoto} className="btn-line !py-2.5">Remove</button>}
               </div>
+              <Link to="/change-password" className="text-[13px] font-semibold text-accent hover:underline">Change password</Link>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onPickPhoto} className="hidden" aria-label="Choose a profile picture" />
               {photoError && <p role="alert" className="text-[13px] text-red-500">{photoError}</p>}
             </div>
