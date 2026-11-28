@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout.jsx';
-import Dialog from '../../components/admin/Dialog.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import CareerInterests from './CareerInterests.jsx';
-import { deleteCareerRole, getCareers, reorderCareerRoles } from '../../lib/careersApi.js';
+import { getCareers, reorderCareerRoles } from '../../lib/careersApi.js';
 import { STATUS_LABEL } from '../../lib/careerRules.js';
 
 const SITE_CAREERS_URL = 'https://nandivex.com/careers';
@@ -12,8 +11,6 @@ const SITE_CAREERS_URL = 'https://nandivex.com/careers';
 const icon = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
 const PlusIcon = () => <svg {...icon} strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>;
 const GripIcon = () => <svg {...icon} strokeWidth="3"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" /></svg>;
-const TrashIcon = () => <svg {...icon}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>;
-const EditIcon = () => <svg {...icon}><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3zM14 7l3 3" /></svg>;
 const ExternalIcon = () => <svg {...icon}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
 
 const STATUS_STYLE = {
@@ -31,7 +28,6 @@ export default function Careers() {
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { getCareers().then(setData).catch((err) => setLoadError(err.message)); }, []);
@@ -81,21 +77,6 @@ export default function Careers() {
     }
   }
 
-  async function confirmDelete() {
-    setBusy(true);
-    try {
-      await deleteCareerRole(deleting.id);
-      setRoles(roles.filter((r) => r.id !== deleting.id));
-      toast.success('Role deleted');
-      setDeleting(null);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const closeDelete = useCallback(() => setDeleting(null), []);
   const tabs = [['all', 'All'], ['open', 'Open'], ['upcoming', 'Coming soon'], ['hidden', 'Hidden']];
 
   return (
@@ -136,7 +117,8 @@ export default function Careers() {
                   <li key={r.id}
                     onDragOver={(e) => { if (dragId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overId !== r.id) setOverId(r.id); } }}
                     onDrop={(e) => { e.preventDefault(); moveTo(shown.find((x) => x.id === dragId), r); setDragId(null); setOverId(null); }}
-                    className={`flex items-center gap-3 px-4 py-3.5 transition sm:px-6 ${dragId === r.id ? 'opacity-40' : ''} ${overId === r.id && dragId && dragId !== r.id ? 'bg-tint/60 ring-2 ring-inset ring-accent' : ''}`}>
+                    className={`transition ${dragId === r.id ? 'opacity-40' : ''} ${overId === r.id && dragId && dragId !== r.id ? 'bg-tint/60 ring-2 ring-inset ring-accent' : ''}`}>
+                    <div className="flex items-center gap-3 px-4 py-3.5 sm:px-6">
                     <button type="button" disabled={busy} aria-label={`Move ${r.title}. Drag, or use the up and down arrow keys.`} title="Drag to reorder"
                       draggable={!busy}
                       onDragStart={(e) => { setDragId(r.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.id); const row = e.currentTarget.closest('li'); if (row) e.dataTransfer.setDragImage(row, 24, 24); }}
@@ -154,8 +136,7 @@ export default function Careers() {
                         {r.skills.length > 0 && <span className="hidden truncate text-muted sm:inline">{r.skills.slice(0, 4).join(', ')}{r.skills.length > 4 ? '…' : ''}</span>}
                       </span>
                     </Link>
-                    <Link to={`/admin/careers/${r.id}`} aria-label={`Edit ${r.title}`} className={iconBtn}><EditIcon /></Link>
-                    <button type="button" onClick={() => setDeleting(r)} aria-label={`Delete ${r.title}`} className={`${iconBtn} enabled:hover:!bg-red-500/10 enabled:hover:!text-red-600`}><TrashIcon /></button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -168,14 +149,6 @@ export default function Careers() {
         {!data && !loadError && <p className="p-8 text-center text-sm text-muted">Loading…</p>}
       </div>
 
-      {deleting && (
-        <Dialog title="Delete this role?" description={`"${deleting.title}" will disappear from the website at once. This cannot be undone. If you may want it again, hide it instead.`} onClose={closeDelete}>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button type="button" onClick={closeDelete} className="btn-line">Cancel</button>
-            <button type="button" onClick={confirmDelete} disabled={busy} className="btn border-red-600 bg-red-600 text-white hover:bg-red-700">{busy ? 'Deleting…' : 'Delete'}</button>
-          </div>
-        </Dialog>
-      )}
     </AdminLayout>
   );
 }

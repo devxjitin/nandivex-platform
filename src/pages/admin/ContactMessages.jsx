@@ -10,7 +10,6 @@ const CheckIcon = () => <svg {...icon} strokeWidth="2.5"><path d="M5 12.5l4.5 4.
 const UndoIcon = () => <svg {...icon}><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" /></svg>;
 
 const when = (iso) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-const iconBtn = 'grid h-9 w-9 flex-none place-items-center rounded-full text-muted transition enabled:hover:bg-tint enabled:hover:text-accent disabled:opacity-30';
 
 /** Messages sent through the contact form on nandivex.com. */
 export default function ContactMessages() {
@@ -103,10 +102,6 @@ export default function ContactMessages() {
                           </span>
                           {!open && <span className="mt-1.5 block truncate text-sm text-muted">{m.message}</span>}
                         </button>
-                        <button type="button" onClick={() => toggle(m)} disabled={busy} aria-label={m.status === 'new' ? 'Mark as handled' : 'Mark as new'} title={m.status === 'new' ? 'Mark as handled' : 'Mark as new'} className={iconBtn}>
-                          {m.status === 'new' ? <CheckIcon /> : <UndoIcon />}
-                        </button>
-                        <button type="button" onClick={() => setDeleting(m)} aria-label={`Delete message from ${m.name}`} className={`${iconBtn} enabled:hover:!bg-red-500/10 enabled:hover:!text-red-600`}><TrashIcon /></button>
                       </div>
                       {open && (
                         <div className="mt-3 space-y-3 rounded-xl bg-soft/60 p-4 text-sm">
@@ -117,7 +112,15 @@ export default function ContactMessages() {
                             {m.company && <div><dt className="inline font-semibold">Company: </dt><dd className="inline">{m.company}</dd></div>}
                             {m.budget && <div><dt className="inline font-semibold">Budget: </dt><dd className="inline">{m.budget}</dd></div>}
                           </dl>
-                          <a href={`mailto:${m.email}?subject=${encodeURIComponent('Re: your message to NandiVex Technologies')}`} className="btn-line !py-2 text-[13px]">Reply by email</a>
+                          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                            <a href={`mailto:${m.email}?subject=${encodeURIComponent('Re: your message to NandiVex Technologies')}`} className="btn-line !py-2 text-[13px]">Reply by email</a>
+                            <button type="button" onClick={() => toggle(m)} disabled={busy} className="btn-line !py-2 text-[13px]">
+                              {m.status === 'new' ? <><CheckIcon /> Mark as handled</> : <><UndoIcon /> Mark as new</>}
+                            </button>
+                            <button type="button" onClick={() => setDeleting(m)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-red-600 transition hover:bg-red-500/10 disabled:opacity-40 sm:ml-auto">
+                              <TrashIcon /> Delete message
+                            </button>
+                          </div>
                         </div>
                       )}
                     </li>
