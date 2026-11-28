@@ -11,9 +11,7 @@ import Select from '../components/Select.jsx';
 import { COUNTRIES, INDIAN_STATES, lookupPincode } from '../lib/places.js';
 import { BLOOD_GROUPS, GENDERS, normalizePhone, todayYmd, validateProfile } from '../lib/profileRules.js';
 import { getProfile, removePhoto, resizeImage, saveProfile, uploadPhoto } from '../lib/profileApi.js';
-import { TasksCard } from '../components/tasks/PersonTasks.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { listTasks } from '../lib/tasksApi.js';
 import { useSession } from '../lib/session.jsx';
 
 const ADDRESS_FIELDS = [
@@ -150,8 +148,6 @@ function AddressFields({ prefix, value, onChange, onTouch, errors }) {
 
 export default function Profile() {
   const { user, setUser } = useSession();
-  const [myTasks, setMyTasks] = useState(null);
-  useEffect(() => { listTasks().then((all) => setMyTasks(all.filter((t) => t.assignee.id === user?.id))).catch(() => setMyTasks([])); }, [user?.id]);
   const toast = useToast();
   const [form, setForm] = useState(null);
   const [saved, setSaved] = useState(null); // the profile as last loaded or saved, for the completion card
@@ -324,7 +320,6 @@ export default function Profile() {
         <div className="space-y-6">
           <ProfileProgress items={progress} />
 
-          {myTasks && <TasksCard tasks={myTasks} personId={user.id} own />}
 
           {/* Picture and who this is */}
           <section className="flex flex-col gap-6 rounded-2xl border border-line bg-surface p-6 shadow-card sm:flex-row sm:items-center sm:p-8">
