@@ -1,0 +1,71 @@
+name: Deploy API
+
+# Runs when the API changes on main. It asks the app server (over AWS Systems Manager) to run the fixed
+# `nandivex-api-deploy` document: back up the current image, pull this commit, rebuild, restart, check
+# /health, and roll back by itself if the check fails. See deploy/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# One deploy at a time; a second merge waits for the first instead of cancelling it half way.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      INSTANCE_ID: i-0406c8cd427888ac6
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::143920986615:role/nandivex-api-github-deploy
+          aws-region: ap-south-1
+
+      - name: Deploy on the server
+        run: |
+          set -euo pipefail
+          CID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name nandivex-api-deploy \
+            --parameters "sha=$GITHUB_SHA" \
+            --comment "GitHub deploy $GITHUB_SHA" \
+            --query 'Command.CommandId' --output text)
+          echo "SSM command: $CID"
+
+          STATUS=Pending
+          for _ in $(seq 1 120); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Pending|InProgress|Delayed) ;; *) break ;; esac
+          done
+
+          echo "---- server output ----"
+          aws ssm get-command-invocation --command-id "$CID" --instance-id "$INSTANCE_ID" \
+            --query StandardOutputContent --output text || true
+          ERR=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$INSTANCE_ID" \
+            --query StandardErrorContent --output text || true)
+          if [ -n "$ERR" ] && [ "$ERR" != "None" ]; then echo "---- server errors ----"; echo "$ERR"; fi
+
+          echo "Final status: $STATUS"
+          [ "$STATUS" = "Success" ]
+
+      - name: Check the live API
+        run: |
+          for _ in 1 2 3 4 5; do
+            if curl -fsS https://api.nandivex.in/health; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "api.nandivex.in/health did not answer"; exit 1
